@@ -100,12 +100,18 @@ class LmsTest extends TestCase
         $this->assertSame('inactive', $user->status);
         Notification::assertSentTo($user, Invitation::class);
         $url = Notification::sent($user, Invitation::class)->first()->toMail($user)->actionUrl;
-        $this->get($url)->assertOk();
+        $this->get($url)->assertOk()
+            ->assertSee('New password')
+            ->assertSee('Confirm new password')
+            ->assertSee('Use at least 12 characters')
+            ->assertSee('Verify email & activate', false)
+            ->assertDontSee("@include('auth.password-fields')");
         $this->get($url.'x')->assertStatus(410)->assertSee('Activation link unavailable');
         $this->post($url, ['password' => 'ActivatedPass123', 'password_confirmation' => 'ActivatedPass123'])->assertRedirect('/login');
         $this->assertGuest();
         $this->assertSame('active', $user->fresh()->status);
         $this->assertNotNull($user->fresh()->email_verified_at);
+        $this->assertTrue(Hash::check('ActivatedPass123', $user->fresh()->password));
         $this->get('/login')->assertOk();
         $this->post('/login', ['email' => $user->email, 'password' => 'ActivatedPass123'])->assertRedirect('/dashboard');
         $this->get('/dashboard')->assertOk();
