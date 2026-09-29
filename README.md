@@ -15,6 +15,8 @@ A working university learning portal with Admin, Teacher and Student roles, buil
 
 PHP 8.2+, Composer 2 and MySQL 8.0+. PHP must include PDO MySQL, mbstring, fileinfo, DOM/XML, curl, openssl and zip. Enable PDO SQLite for the test suite. See [deployment details](docs/DEPLOYMENT.md) for the full list. Tested with PHP 8.2.12 and MySQL 8.4.3.
 
+For Vercel, see the [Vercel deployment guide](docs/VERCEL.md) for environment variables, private object storage, scheduler requirements, and platform limits.
+
 No Node build, React, Vue, Inertia or Livewire is required. Bootstrap CSS/JS are already in `public/vendor`. `package.json` records the frontend dependency for maintainers.
 
 ## Local installation
