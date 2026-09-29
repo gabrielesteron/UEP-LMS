@@ -65,20 +65,28 @@ class AuthController extends Controller
 
     public function activation(Request $r, User $user)
     {
-        abort_unless($user->status === 'inactive' && ! $user->email_verified_at, 403);
-        abort_unless(Password::broker()->tokenExists($user, (string) $r->query('token')), 403);
+        if ($user->status !== 'inactive' || $user->email_verified_at || ! Password::broker()->tokenExists($user, (string) $r->query('token'))) {
+            return response()->view('auth.activation-link-invalid', [], 410);
+        }
 
         return view('auth.activate', compact('user'));
     }
 
     public function activate(Request $r, User $user)
     {
-        abort_unless($user->status === 'inactive' && ! $user->email_verified_at, 403);
+        if ($user->status !== 'inactive' || $user->email_verified_at || ! Password::broker()->tokenExists($user, (string) $r->query('token'))) {
+            return response()->view('auth.activation-link-invalid', [], 410);
+        }
         $r->validate(['password' => ['required', 'confirmed', PasswordRule::min(12)->mixedCase()->numbers()]]);
-        abort_unless(Password::broker()->tokenExists($user, (string) $r->query('token')), 403);
         $user->update(['password' => $r->password, 'email_verified_at' => now(), 'status' => 'active']);
         Password::broker()->deleteToken($user);
         event(new Verified($user));
+
+        if (Auth::check()) {
+            Auth::logout();
+            $r->session()->invalidate();
+            $r->session()->regenerateToken();
+        }
 
         return redirect('/login')->with('success', 'Email verified and account activated. Sign in with your new password.');
     }

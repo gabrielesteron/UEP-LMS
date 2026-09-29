@@ -99,15 +99,33 @@ class LmsTest extends TestCase
         $user = User::where('email', 'invite@example.com')->firstOrFail();
         $this->assertSame('inactive', $user->status);
         Notification::assertSentTo($user, Invitation::class);
-        $token = Password::broker()->createToken($user);
-        $url = URL::temporarySignedRoute('activate', now()->addHour(), ['user' => $user->id, 'token' => $token]);
-        auth()->logout();
+        $url = Notification::sent($user, Invitation::class)->first()->toMail($user)->actionUrl;
         $this->get($url)->assertOk();
-        $this->get($url.'x')->assertForbidden();
+        $this->get($url.'x')->assertStatus(410)->assertSee('Activation link unavailable');
         $this->post($url, ['password' => 'ActivatedPass123', 'password_confirmation' => 'ActivatedPass123'])->assertRedirect('/login');
+        $this->assertGuest();
         $this->assertSame('active', $user->fresh()->status);
         $this->assertNotNull($user->fresh()->email_verified_at);
-        $this->get($url)->assertForbidden();
+        $this->get('/login')->assertOk();
+        $this->post('/login', ['email' => $user->email, 'password' => 'ActivatedPass123'])->assertRedirect('/dashboard');
+        $this->get('/dashboard')->assertOk();
+        $this->get($url)->assertStatus(410);
+    }
+
+    public function test_resending_invitation_explains_why_an_older_link_no_longer_works(): void
+    {
+        Notification::fake();
+        $this->actingAs($this->admin())->post('/admin/manage/users', ['name' => 'Invited Learner', 'email' => 'invite@example.com', 'role' => 'student', 'status' => 'active'])->assertRedirect('/admin/manage/users');
+        $user = User::where('email', 'invite@example.com')->firstOrFail();
+        $firstUrl = Notification::sent($user, Invitation::class)->first()->toMail($user)->actionUrl;
+
+        $this->post('/admin/users/'.$user->id.'/invite')->assertRedirect();
+        $latestUrl = Notification::sent($user, Invitation::class)->last()->toMail($user)->actionUrl;
+
+        $this->get($firstUrl)->assertStatus(410)->assertSee('latest email');
+        $this->get($latestUrl)->assertOk();
+        $this->post($latestUrl, ['password' => 'ActivatedPass123', 'password_confirmation' => 'ActivatedPass123'])->assertRedirect('/login');
+        $this->assertSame('active', $user->fresh()->status);
     }
 
     public function test_password_reset_works(): void
