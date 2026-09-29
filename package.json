@@ -1,0 +1,9 @@
+{
+    "name": "uep-lms",
+    "version": "1.0.0",
+    "private": true,
+    "description": "Laravel Blade UI with bundled Bootstrap assets; no Node build required.",
+    "dependencies": {
+        "bootstrap": "5.3.8"
+    }
+}

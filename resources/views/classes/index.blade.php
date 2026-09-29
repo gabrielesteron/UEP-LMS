@@ -1,0 +1,3 @@
+@extends('layouts.app')
+@section('title','My classes')
+@section('content')<h1>{{ auth()->user()->role === 'teacher' ? 'My blocks & subjects' : 'My classes' }}</h1><p class="text-secondary mb-4">Your academic classes, organized by block.</p>@forelse($classes->groupBy('block_id') as $group)<h2 class="mt-4 mb-3">{{ $group->first()->block->program->code }} · Block {{ $group->first()->block->name }} <span class="small-muted">{{ $group->first()->block->academicYear->name }} / Semester {{ $group->first()->block->semester }}</span></h2><div class="row g-3">@foreach($group as $classroom)<div class="col-md-6 col-xl-4">@include('classes.card')</div>@endforeach</div>@empty<div class="empty">No assigned classes yet.</div>@endforelse @endsection

@@ -1,0 +1,3 @@
+@extends('layouts.app')
+@section('title','System settings')
+@section('content')<h1 class="mb-4">Attendance settings</h1><div class="card"><div class="card-body"><form method="post" action="/admin/settings">@csrf @method('PUT')<label class="form-label">Late threshold in minutes<input class="form-control" type="number" name="late_threshold" value="{{ $threshold }}" min="1" max="120" required></label><p class="text-secondary">Arrivals below this threshold are Present; arrivals at or above it are Late. This configurable project default is not an official UEP policy. Changes apply to new sessions.</p><button class="btn btn-primary">Save settings</button></form></div></div>@endsection
