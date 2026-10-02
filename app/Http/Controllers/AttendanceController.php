@@ -21,13 +21,13 @@ class AttendanceController extends Controller
         Access::classroom($r->user(), $classroom, true);
         $data = $r->validate(['date' => 'required|date|before_or_equal:today', 'start_time' => 'required|date_format:H:i', 'end_time' => 'required|date_format:H:i|after:start_time']);
         if ($r->user()->role !== 'admin' && Carbon::parse($data['date'])->lt(today()->subDays(7))) {
-            return back()->withErrors(['date' => 'Only administrators can create attendance more than seven days ago.']);
+            return back()->withInput()->withErrors(['date' => 'Only administrators can create attendance more than seven days ago.']);
         }
         try {
             $session = AttendanceSession::create($data + ['teacher_assignment_id' => $classroom->id, 'late_threshold' => (int) (Setting::where('key', 'late_threshold')->value('value') ?? 15)]);
         } catch (QueryException $e) {
             if ($e->getCode() === '23000') {
-                return back()->withErrors(['date' => 'An attendance session already exists for this class, date, and start time.']);
+                return back()->withInput()->withErrors(['date' => 'An attendance session already exists for this class, date, and start time.']);
             } throw $e;
         }
 
@@ -37,7 +37,10 @@ class AttendanceController extends Controller
     public function show(Request $r, AttendanceSession $session)
     {
         Access::classroom($r->user(), $session->classroom, true);
-        $session->load('classroom.block.program', 'classroom.subject', 'records.excuse', 'records.logs.user');
+        $session->load('classroom.block.program', 'classroom.subject', 'records');
+        if (config('lms.show_advanced_features')) {
+            $session->load('records.excuse', 'records.logs.user');
+        }
         $enrollments = $session->classroom->enrollments()->with('student.user')->get();
         $recordsByStudent = $session->records->keyBy('student_id');
 

@@ -40,7 +40,9 @@ class AdminController extends Controller
             }
         }
 
-        return view('admin.index', ['resource' => $resource, 'fields' => $fields, 'rows' => $q->latest('id')->paginate(15)->withQueryString()]);
+        $fieldChoices = collect($fields)->map(fn ($type) => Catalog::choices($type))->all();
+
+        return view('admin.index', ['resource' => $resource, 'fields' => $fields, 'fieldChoices' => $fieldChoices, 'rows' => $q->latest('id')->paginate(15)->withQueryString()]);
     }
 
     public function form(string $resource, ?int $id = null)
@@ -51,7 +53,10 @@ class AdminController extends Controller
             abort(403, 'Manage administrator accounts with the console command.');
         }
 
-        return view('admin.form', compact('resource', 'fields', 'row'));
+        $fieldChoices = collect($fields)->map(fn ($type) => Catalog::choices($type))->all();
+        $missingRelated = collect($fields)->contains(fn ($type, $field) => ! in_array($type, ['text', 'email', 'date', 'time', 'textarea', 'number']) && empty($fieldChoices[$field]));
+
+        return view('admin.form', compact('resource', 'fields', 'row', 'fieldChoices', 'missingRelated'));
     }
 
     public function save(CatalogRequest $r, string $resource, ?int $id = null)

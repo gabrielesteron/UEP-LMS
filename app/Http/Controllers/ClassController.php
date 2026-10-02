@@ -28,6 +28,9 @@ class ClassController extends Controller
         $student = $r->user()->role === 'student';
         $content = [];
         foreach (ClassContent::all() as $kind => [$model]) {
+            if ($kind === 'quizzes' && ! config('lms.show_advanced_features')) {
+                continue;
+            }
             $content[$kind] = $model::where('teacher_assignment_id', $classroom->id)->when($student, fn ($q) => $q->where('status', 'published'))->when($r->filled('q'), fn ($q) => $q->where('title', 'like', '%'.$r->q.'%'))->orderBy($kind === 'lessons' ? 'position' : 'id')->get();
         }
         $students = $student ? collect() : $classroom->enrollments()->with('student.user')->get()->pluck('student')->filter(fn ($s) => $s->user);
@@ -131,7 +134,7 @@ class ClassController extends Controller
             $assignment->submissions()->create(['student_id' => $r->user()->student->id, 'version' => $version, 'answer' => $r->input('answer'), 'submitted_at' => now(), 'is_late' => $late, 'status' => $late ? 'late' : 'submitted'] + Files::upload($r));
         });
 
-        return back()->with('success', 'Submission saved. Earlier versions remain available.');
+        return back()->with('success', config('lms.show_advanced_features') ? 'Submission saved. Earlier versions remain available.' : 'Submission saved. Your latest work is shown below.');
     }
 
     public function grade(Request $r, AssignmentSubmission $submission)

@@ -36,3 +36,7 @@ section[id]{scroll-margin-top:1rem}
   .breadcrumb{margin-bottom:16px}
 }
 @media(prefers-reduced-motion:reduce){.sidebar,.class-card{transition:none}}
+
+.nav-label{line-height:1.6;letter-spacing:1px}
+.class-card .border-top{gap:12px;flex-wrap:wrap}
+.calendar-day .badge{max-width:100%;white-space:normal}

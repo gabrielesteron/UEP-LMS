@@ -12,41 +12,60 @@
 @auth
 @php
     $portalUser = auth()->user();
-    $unreadCount = $portalUser->unreadNotifications()->count();
     $navigation = [
-        '/dashboard' => 'Overview',
-        '/classes' => $portalUser->role === 'teacher' ? 'My blocks & subjects' : 'My classes',
-        '/schedule' => 'Class schedule',
-        '/announcements' => 'Announcements',
-        '/reports/attendance' => 'Attendance',
-        '/reports/grades' => 'Grades & reports',
-        '/search' => 'Search learning content',
-        '/notifications' => 'Notifications',
-        '/profile' => 'My profile',
+        'Academic Management' => $portalUser->role === 'admin' ? [
+            '/admin/manage/academic-years' => 'Academic Years',
+            '/admin/manage/programs' => 'Programs',
+            '/admin/manage/year-levels' => 'Year Levels',
+            '/admin/manage/blocks' => 'Blocks',
+            '/admin/manage/subjects' => 'Subjects',
+            '/admin/manage/students' => 'Students',
+            '/admin/manage/teachers' => 'Teachers',
+            '/admin/manage/teacher-assignments' => 'Classes & Teacher Assignments',
+            '/admin/manage/users' => 'User Accounts',
+        ] : ['/classes' => 'My Classes'],
+        'Learning & Activities' => [
+            '/classes?module=learning' => $portalUser->role === 'admin' ? 'Monitor Class Activities' : 'Lessons, Materials & Assignments',
+        ],
+        'Student Monitoring' => [
+            ...($portalUser->role === 'teacher' ? ['/classes?module=monitoring' => 'Record Attendance & Grades'] : []),
+            '/reports/attendance' => $portalUser->role === 'admin' ? 'Attendance Reports' : 'Attendance',
+            '/reports/grades' => $portalUser->role === 'admin' ? 'Grade Reports' : 'Grades',
+            ...($portalUser->role === 'student' ? ['/schedule' => 'Schedule'] : []),
+        ],
     ];
+    if (config('lms.show_advanced_features')) {
+        $navigation['Learning & Activities']['/search'] = 'Search Learning Content';
+        $navigation['Learning & Activities']['/notifications'] = 'Notifications';
+        if ($portalUser->role === 'admin') {
+            $navigation['Student Monitoring']['/admin/settings'] = 'Attendance Settings';
+        }
+    }
 @endphp
 <a class="skip-link" href="#main-content">Skip to content</a>
 <div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
 <aside class="sidebar" id="sidebar" aria-label="Primary navigation">
     <button class="btn btn-sm btn-outline-light d-lg-none mb-3" type="button" id="menuClose">Close menu</button>
     <a class="brand" href="/dashboard"><span class="brand-mark">U</span><span>UEP <b>LMS</b><small>THE CAMPUS LEARNING PORTAL</small></span></a>
-    <nav aria-label="Workspace">
-        <div class="nav-label">WORKSPACE</div>
-        @foreach($navigation as $url => $label)
-            @php($active = request()->is(ltrim($url, '/')))
-            <a class="nav-item {{ $active ? 'active' : '' }}" href="{{ $url }}" @if($active) aria-current="page" @endif>{{ $label }} @if($url === '/notifications' && $unreadCount)<span class="badge text-bg-light">{{ $unreadCount }}</span>@endif</a>
-        @endforeach
-    </nav>
-    @if($portalUser->role === 'admin')
-        <nav aria-label="Administration">
-            <div class="nav-label">ADMINISTRATION</div>
-            @foreach(\App\Services\Catalog::all() as $resource => $definition)
-                @php($active = request()->is('admin/manage/'.$resource.'*'))
-                <a class="nav-item {{ $active ? 'active' : '' }}" href="/admin/manage/{{ $resource }}" @if($active) aria-current="page" @endif>{{ Str::headline($resource) }}</a>
+    <a class="nav-item {{ request()->is('dashboard') ? 'active' : '' }}" href="/dashboard" @if(request()->is('dashboard')) aria-current="page" @endif>Overview</a>
+    @foreach($navigation as $module => $links)
+        <nav aria-label="{{ $module }}" data-core-module>
+            <div class="nav-label">{{ $module }}</div>
+            @foreach($links as $url => $label)
+                @php
+                    $path = parse_url($url, PHP_URL_PATH);
+                    $active = $path === '/classes'
+                        ? request()->is('classes') && request('module', 'academic') === (str_contains($url, 'module=learning') ? 'learning' : (str_contains($url, 'module=monitoring') ? 'monitoring' : 'academic'))
+                        : request()->is(ltrim($path, '/'), ltrim($path, '/').'/*');
+                @endphp
+                <a class="nav-item {{ $active ? 'active' : '' }}" href="{{ $url }}" @if($active) aria-current="page" @endif>{{ $label }}</a>
             @endforeach
-            <a class="nav-item {{ request()->is('admin/settings') ? 'active' : '' }}" href="/admin/settings" @if(request()->is('admin/settings')) aria-current="page" @endif>System settings</a>
         </nav>
-    @endif
+    @endforeach
+    <nav aria-label="Announcements and profile" class="mt-4 border-top border-secondary pt-2">
+        <a class="nav-item {{ request()->is('announcements') ? 'active' : '' }}" href="/announcements" @if(request()->is('announcements')) aria-current="page" @endif>Announcements</a>
+        <a class="nav-item {{ request()->is('profile*') ? 'active' : '' }}" href="/profile" @if(request()->is('profile*')) aria-current="page" @endif>My Profile</a>
+    </nav>
     <div class="sidebar-note">A focused space for<br>your academic journey.</div>
 </aside>
 <div class="workspace">

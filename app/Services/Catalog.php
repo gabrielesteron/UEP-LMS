@@ -71,10 +71,28 @@ class Catalog
             return User::where('role', strtok($type, '-'))->pluck('name', 'id')->all();
         }
         if (isset(self::all()[$type])) {
-            return self::all()[$type][0]::all()->mapWithKeys(fn ($row) => [$row->id => self::label($row)])->all();
+            $relations = match ($type) {
+                'teacher-assignments' => ['block.program', 'block.academicYear', 'subject'],
+                'blocks' => ['program', 'academicYear'],
+                'students', 'teachers' => ['user'],
+                default => [],
+            };
+
+            return self::all()[$type][0]::with($relations)->get()->mapWithKeys(fn ($row) => [$row->id => self::label($row)])->all();
         }
 
         return [];
+    }
+
+    public static function fieldLabel(string $field, ?string $resource = null): string
+    {
+        return match ($field) {
+            'name' => $resource === 'year-levels' ? 'Year Level Name' : 'Name',
+            'user_id' => 'User Account',
+            'teacher_assignment_id' => 'Class',
+            'allow_text' => 'Allow Text Submission',
+            default => \Illuminate\Support\Str::headline(preg_replace('/_id$/', '', $field)),
+        };
     }
 
     public static function rules(string $resource, ?int $id): array

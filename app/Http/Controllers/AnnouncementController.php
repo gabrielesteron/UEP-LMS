@@ -19,7 +19,7 @@ class AnnouncementController extends Controller
     public function save(Request $r, ?int $id = null)
     {
         abort_unless(in_array($r->user()->role, ['admin', 'teacher']), 403);
-        $data = $r->validate(['title' => 'required|string|max:180', 'body' => 'required|string|max:10000', 'teacher_assignment_id' => 'nullable|exists:teacher_assignments,id', 'program_id' => 'nullable|exists:programs,id', 'block_id' => 'nullable|exists:blocks,id']);
+        $data = $r->validate(['title' => 'required|string|max:180', 'body' => 'required|string|max:10000', 'teacher_assignment_id' => ($r->user()->role === 'teacher' ? 'required|' : 'nullable|').'exists:teacher_assignments,id', 'program_id' => 'nullable|exists:programs,id', 'block_id' => 'nullable|exists:blocks,id']);
         $row = $id ? Announcement::findOrFail($id) : new Announcement;
         if ($id) {
             abort_unless($r->user()->role === 'admin' || $row->user_id === $r->user()->id, 403);

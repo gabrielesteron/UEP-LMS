@@ -16,4 +16,11 @@ class CatalogRequest extends FormRequest
     {
         return Catalog::rules($this->route('resource'), $this->route('id') ? (int) $this->route('id') : null);
     }
+
+    public function attributes(): array
+    {
+        [, $fields] = Catalog::definition($this->route('resource'));
+
+        return collect($fields)->mapWithKeys(fn ($type, $field) => [$field => Catalog::fieldLabel($field, $this->route('resource'))])->all();
+    }
 }
