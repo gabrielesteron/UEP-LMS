@@ -1,0 +1,8 @@
+<div class="border rounded p-3 mb-3" data-repeat-row>
+    <div class="row g-3">
+        <div class="col-md-6"><label class="form-label" for="assignment_subject_{{ $rowIndex }}">Subject</label><select class="form-select" id="assignment_subject_{{ $rowIndex }}" name="assignments[{{ $rowIndex }}][subject]" required>@foreach($draft['subjects'] as $subjectIndex=>$subject)<option value="{{ $subjectIndex }}" @selected((int)$assignment['subject'] === $subjectIndex)>{{ $subject['code'] }} — {{ $subject['name'] }}</option>@endforeach</select></div>
+        <div class="col-md-6"><label class="form-label" for="assignment_teacher_{{ $rowIndex }}">Teacher</label><select class="form-select" id="assignment_teacher_{{ $rowIndex }}" name="assignments[{{ $rowIndex }}][teacher_id]" required><option value="">Choose teacher</option>@foreach($teachers as $teacher)<option value="{{ $teacher->id }}" @selected((string)$assignment['teacher_id'] === (string)$teacher->id)>{{ $teacher->user->name }} — {{ $teacher->employee_number }}</option>@endforeach</select></div>
+        <fieldset class="col-12"><legend class="h6">Blocks</legend><div class="d-flex flex-wrap gap-3">@foreach($draft['blocks'] as $blockIndex=>$block)<label class="form-check"><input class="form-check-input" type="checkbox" name="assignments[{{ $rowIndex }}][blocks][]" value="{{ $blockIndex }}" @checked(in_array($blockIndex, $assignment['blocks']))> <span class="form-check-label">{{ $block['name'] }}</span></label>@endforeach</div></fieldset>
+        <div class="col-12"><button class="btn btn-sm btn-outline-danger" type="button" data-remove>Remove Assignment</button></div>
+    </div>
+</div>

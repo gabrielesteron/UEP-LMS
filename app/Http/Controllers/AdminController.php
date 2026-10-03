@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\CatalogRequest;
 use App\Models\AcademicYear;
-use App\Models\ClassSchedule;
 use App\Models\Enrollment;
 use App\Models\Setting;
 use App\Models\Student;
@@ -12,6 +11,7 @@ use App\Models\TeacherAssignment;
 use App\Models\User;
 use App\Notifications\Invitation;
 use App\Services\Catalog;
+use App\Services\ScheduleConflicts;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -98,10 +98,7 @@ class AdminController extends Controller
                 if ($resource === 'schedules') {
                     $class = TeacherAssignment::findOrFail($data['teacher_assignment_id']);
                     AcademicYear::whereKey($class->block->academic_year_id)->lockForUpdate()->first();
-                    $conflict = ClassSchedule::where('day', $data['day'])->when($id, fn ($q) => $q->where('id', '!=', $id))
-                        ->where('start_time', '<', $data['end_time'])->where('end_time', '>', $data['start_time'])
-                        ->whereHas('classroom.block', fn ($q) => $q->where('academic_year_id', $class->block->academic_year_id)->where('semester', $class->block->semester))
-                        ->where(fn ($q) => $q->where('room', $data['room'])->orWhereHas('classroom', fn ($q) => $q->where('teacher_id', $class->teacher_id)->orWhere('block_id', $class->block_id)))->exists();
+                    $conflict = ScheduleConflicts::exists($class, $data, $id);
                     if ($conflict) {
                         throw ValidationException::withMessages(['start_time' => 'Schedule conflicts with this teacher, block, or room.']);
                     }
@@ -185,8 +182,8 @@ class AdminController extends Controller
     public function saveSettings(Request $r)
     {
         $r->validate(['late_threshold' => 'required|integer|min:1|max:120']);
-        Setting::updateOrCreate(['key' => 'late_threshold'],['value' => $r->late_threshold]);
+        Setting::updateOrCreate(['key' => 'late_threshold'], ['value' => $r->late_threshold]);
 
-        return back()->with('success','Default saved. Existing attendance sessions retain their original threshold.');
+        return back()->with('success', 'Default saved. Existing attendance sessions retain their original threshold.');
     }
 }

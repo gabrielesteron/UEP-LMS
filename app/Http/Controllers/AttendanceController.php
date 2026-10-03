@@ -13,6 +13,7 @@ use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class AttendanceController extends Controller
 {
@@ -55,6 +56,30 @@ class AttendanceController extends Controller
         return back()->with('success', 'Attendance saved with an audit entry.');
     }
 
+    public function bulkRecord(Request $r, AttendanceSession $session)
+    {
+        AttendanceService::editable($r->user(), $session);
+        $completeRow = $r->filled('expected_count') ? 'present|' : '';
+        $data = $r->validate([
+            'records' => 'required|array|min:1|max:500',
+            'expected_count' => 'nullable|integer|min:1|max:500',
+            'records.*' => 'required|array:student_id,status,minutes_late,remarks,reason',
+            'records.*.student_id' => 'required|integer|distinct',
+            'records.*.status' => 'required|in:present,late,absent,excused',
+            'records.*.minutes_late' => $completeRow.'nullable|integer|min:0|max:1440',
+            'records.*.remarks' => $completeRow.'nullable|string|max:2000',
+            'records.*.reason' => $completeRow.($r->user()->role === 'admin' ? 'required' : 'nullable').'|string|max:2000',
+        ], ['records.*.minutes_late.present' => 'An attendance field did not reach the server. No records were changed. Ask an administrator to check the form-input limit.',
+            'records.*.remarks.present' => 'An attendance field did not reach the server. No records were changed. Ask an administrator to check the form-input limit.',
+            'records.*.reason.present' => 'An attendance field did not reach the server. No records were changed. Ask an administrator to check the form-input limit.']);
+        if ($r->filled('expected_count') && count($data['records']) !== (int) $data['expected_count']) {
+            throw ValidationException::withMessages(['records' => 'Not all attendance rows reached the server. No records were changed. Ask your administrator to check the server form-input limit.']);
+        }
+        $count = AttendanceService::recordMany($r->user(), $session, $data['records']);
+
+        return back()->with('success', $count ? 'Attendance saved for '.$count.' students.' : 'No attendance changes needed.');
+    }
+
     public function excuse(Request $r, AttendanceRecord $record)
     {
         abort_unless($r->user()->role === 'student' && $record->student_id === $r->user()->student?->id, 403);
@@ -79,6 +104,6 @@ class AttendanceController extends Controller
             $excuse->update($data);
         });
 
-        return back()->with('success','Excuse reviewed.');
+        return back()->with('success', 'Excuse reviewed.');
     }
 }

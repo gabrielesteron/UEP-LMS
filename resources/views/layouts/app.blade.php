@@ -14,6 +14,7 @@
     $portalUser = auth()->user();
     $navigation = [
         'Academic Management' => $portalUser->role === 'admin' ? [
+            '/admin/setup' => '+ Set Up School Year',
             '/admin/manage/academic-years' => 'Academic Years',
             '/admin/manage/programs' => 'Programs',
             '/admin/manage/year-levels' => 'Year Levels',

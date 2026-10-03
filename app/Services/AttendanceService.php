@@ -30,12 +30,7 @@ class AttendanceService
     {
         self::editable($user, $session);
         abort_unless($session->classroom->enrollments()->where('student_id', $studentId)->exists(), 403);
-        if ($user->role === 'admin' && blank($data['reason'] ?? null)) {
-            throw ValidationException::withMessages(['reason' => 'Administrator corrections require a reason.']);
-        }
-        if (isset($data['minutes_late']) && in_array($data['status'], ['present', 'late'])) {
-            $data['status'] = $data['minutes_late'] >= $session->late_threshold ? 'late' : 'present';
-        }
+        $data = self::prepare($user, $session, $data);
 
         return DB::transaction(function () use ($user, $session, $studentId, $data, $update) {
             AttendanceSession::whereKey($session->id)->lockForUpdate()->first();
@@ -46,12 +41,62 @@ class AttendanceService
             if (! $record && $update) {
                 abort(404);
             }
-            $before = $record?->only(['status', 'minutes_late', 'remarks']);
-            $record ??= new AttendanceRecord(['attendance_session_id' => $session->id, 'student_id' => $studentId]);
-            $record->fill(collect($data)->only(['status', 'minutes_late', 'remarks'])->all())->save();
-            AttendanceLog::create(['attendance_record_id' => $record->id, 'user_id' => $user->id, 'before' => $before, 'after' => $record->only(['status', 'minutes_late', 'remarks']), 'reason' => $data['reason'] ?? ($update ? 'Teacher correction' : 'Initial attendance')]);
 
-            return $record;
+            return self::persist($user, $session, $studentId, $data, $record);
         });
+    }
+
+    public static function recordMany(User $user, AttendanceSession $session, array $rows): int
+    {
+        self::editable($user, $session);
+
+        return DB::transaction(function () use ($user, $session, $rows) {
+            AttendanceSession::whereKey($session->id)->lockForUpdate()->firstOrFail();
+            $enrolled = $session->classroom->enrollments()->pluck('student_id')->all();
+            $records = $session->records()->lockForUpdate()->get()->keyBy('student_id');
+            $prepared = [];
+            foreach ($rows as $row) {
+                abort_unless(in_array((int) $row['student_id'], $enrolled), 403);
+                $prepared[] = self::prepare($user, $session, $row);
+            }
+            $changed = 0;
+            foreach ($prepared as $row) {
+                $record = $records->get($row['student_id']);
+                if ($record) {
+                    $candidate = clone $record;
+                    $candidate->fill(collect($row)->only(['status', 'minutes_late', 'remarks'])->all());
+                    if (! $candidate->isDirty()) {
+                        continue;
+                    }
+                }
+                self::persist($user, $session, (int) $row['student_id'], $row, $record);
+                $changed++;
+            }
+
+            return $changed;
+        });
+    }
+
+    private static function prepare(User $user, AttendanceSession $session, array $data): array
+    {
+        if ($user->role === 'admin' && blank($data['reason'] ?? null)) {
+            throw ValidationException::withMessages(['reason' => 'Administrator corrections require a reason.']);
+        }
+        if (isset($data['minutes_late']) && in_array($data['status'], ['present', 'late'])) {
+            $data['status'] = $data['minutes_late'] >= $session->late_threshold ? 'late' : 'present';
+        }
+
+        return $data;
+    }
+
+    private static function persist(User $user, AttendanceSession $session, int $studentId, array $data, ?AttendanceRecord $record): AttendanceRecord
+    {
+        $update = $record !== null;
+        $before = $record?->only(['status', 'minutes_late', 'remarks']);
+        $record ??= new AttendanceRecord(['attendance_session_id' => $session->id, 'student_id' => $studentId]);
+        $record->fill(collect($data)->only(['status', 'minutes_late', 'remarks'])->all())->save();
+        AttendanceLog::create(['attendance_record_id' => $record->id, 'user_id' => $user->id, 'before' => $before, 'after' => $record->only(['status', 'minutes_late', 'remarks']), 'reason' => $data['reason'] ?? ($update ? 'Teacher correction' : 'Initial attendance')]);
+
+        return $record;
     }
 }

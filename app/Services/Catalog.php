@@ -13,6 +13,7 @@ use App\Models\Teacher;
 use App\Models\TeacherAssignment;
 use App\Models\User;
 use App\Models\YearLevel;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class Catalog
@@ -91,7 +92,9 @@ class Catalog
             'user_id' => 'User Account',
             'teacher_assignment_id' => 'Class',
             'allow_text' => 'Allow Text Submission',
-            default => \Illuminate\Support\Str::headline(preg_replace('/_id$/', '', $field)),
+            'due_at' => 'Due Date',
+            'total_points' => 'Points',
+            default => Str::headline(preg_replace('/_id$/', '', $field)),
         };
     }
 

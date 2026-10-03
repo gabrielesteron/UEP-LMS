@@ -2,6 +2,8 @@
 
 A working university learning portal with Admin, Teacher and Student roles, built with Laravel 12, PHP, MySQL, Blade and Bootstrap. This is an independent academic project, not an official University of Eastern Philippines product or policy implementation.
 
+The existing three-module interface now includes guided School Year Setup, CSV preview/enrollment, optional previous-setup copying, bulk attendance/grading, and focused student dashboards. See [workflow guide and verification report](docs/WORKFLOW_IMPROVEMENTS.md) for the complete Admin → Teacher → Student flow and queue-worker requirements.
+
 ## Included
 
 - Academic years, programs, year levels, semester-based blocks, student/teacher profiles, subjects, teacher assignments, automatic block enrollment and schedules with conflict checks.

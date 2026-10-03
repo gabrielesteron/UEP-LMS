@@ -108,7 +108,7 @@ class CoreModulesTest extends TestCase
         $submission = $assignment->submissions()->latest('id')->firstOrFail();
         $this->actingAs($this->user('teacher'))->put('/submissions/'.$submission->id.'/grade', ['score' => 75, 'feedback' => 'Please revise', 'status' => 'returned'])->assertSessionHasNoErrors();
         $dom = $this->dom($this->get('/assignments/1')->assertOk()->getContent());
-        $this->assertSame('returned', $dom->query('//select[@name="status"]/option[@selected]')->item(0)->getAttribute('value'));
+        $this->assertSame('returned', $dom->query('//select[contains(@name,"status")]/option[@selected]')->item(0)->getAttribute('value'));
         $this->from('/assignments/1')->put('/submissions/'.$submission->id.'/grade', ['submission_id' => $submission->id, 'score' => 101, 'feedback' => 'Keep my feedback', 'status' => 'returned'])->assertSessionHasErrors('score');
         $this->get('/assignments/1')->assertSee('Keep my feedback');
         $this->assertDatabaseHas('grades', ['student_id' => 1, 'source_type' => 'assignment', 'source_id' => 1, 'score' => 75]);

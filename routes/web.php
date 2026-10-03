@@ -39,6 +39,8 @@ Route::middleware(['auth', 'active'])->group(function () {
     })->middleware('throttle:3,1')->name('verification.send');
 });
 Route::middleware(['auth', 'active', 'verified'])->group(function () {
+    require __DIR__.'/teacher-workflows.php';
+    require __DIR__.'/academic-setup.php';
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     foreach (['admin', 'teacher', 'student'] as $role) {
         Route::redirect('/'.$role.'/dashboard', '/dashboard')->middleware('role:'.$role);
@@ -96,8 +98,8 @@ Route::middleware(['auth', 'active', 'verified'])->group(function () {
         Route::get('/manage/{resource}', [AdminController::class, 'index']);
         Route::get('/manage/{resource}/create', [AdminController::class, 'form']);
         Route::get('/manage/{resource}/{id}/edit', [AdminController::class, 'form'])->whereNumber('id');
-        Route::post('/manage/{resource}',[AdminController::class, 'save']);
-        Route::put('/manage/{resource}/{id}',[AdminController::class, 'save'])->whereNumber('id');
-        Route::delete('/manage/{resource}/{id}',[AdminController::class, 'delete'])->whereNumber('id');
+        Route::post('/manage/{resource}', [AdminController::class, 'save']);
+        Route::put('/manage/{resource}/{id}', [AdminController::class, 'save'])->whereNumber('id');
+        Route::delete('/manage/{resource}/{id}', [AdminController::class, 'delete'])->whereNumber('id');
     });
 });

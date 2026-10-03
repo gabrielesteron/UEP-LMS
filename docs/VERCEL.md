@@ -64,6 +64,8 @@ The current scheduler in `routes/console.php` runs deadline reminders hourly and
 
 ## Platform limits
 
+School Year Setup CSV invitations require an external supervised `php artisan queue:work database --queue=default --tries=3 --timeout=30` worker running the same source revision and production MySQL, APP_KEY, APP_URL and SMTP environment. Vercel cannot run a persistent Artisan queue worker. The setup transaction queues invitations in the existing jobs table; it reports queued messages, not delivered email. Existing individual Resend invitation remains synchronous. No new migrations are needed. For very large bulk attendance/grade forms, configure PHP `max_input_vars` to at least 3500; incomplete row/field payloads are rejected without partial saves.
+
 Vercel Functions have a 4.5 MB request and response payload limit. This application currently allows class file uploads up to 20 MB and private downloads through Laravel. Such large uploads and downloads cannot be fully supported by the present request flow on Vercel; they require direct-to-storage upload/download work or hosting Laravel on a conventional PHP server. This deployment preparation deliberately does not alter those existing features. Large PDF/XLSX exports can encounter the same response limit. Function duration and memory limits may also affect large reports; choose a region near MySQL.
 
 After connecting and setting variables, verify HTTPS login, all three roles, a small private upload/download, SMTP invitation/reset delivery, the external scheduler, and report exports on the actual Vercel deployment. The local test suite and configuration checks cannot prove the third-party PHP runtime, MySQL provider, storage provider, or Gmail connectivity until those services are configured.

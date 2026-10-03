@@ -18,6 +18,9 @@
 /bootstrap/cache/*.json
 *.pem
 *.key
+*.sql
+*.log
+/.aws/
 .phpactor.json
 .phpunit.result.cache
 Homestead.json

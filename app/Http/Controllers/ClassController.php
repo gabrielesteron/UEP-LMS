@@ -5,17 +5,20 @@ namespace App\Http\Controllers;
 use App\Models\Assignment;
 use App\Models\AssignmentSubmission;
 use App\Models\AttendanceSession;
+use App\Models\Enrollment;
 use App\Models\Grade;
 use App\Models\Student;
 use App\Models\TeacherAssignment;
 use App\Notifications\PortalNotice;
 use App\Services\Access;
+use App\Services\AssignmentGrading;
 use App\Services\ClassContent;
 use App\Services\Files;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class ClassController extends Controller
@@ -47,6 +50,15 @@ class ClassController extends Controller
         Access::classroom($r->user(), $classroom, true);
         [$model,$fields] = ClassContent::definition($kind);
         $row = $id ? $model::where('teacher_assignment_id', $classroom->id)->findOrFail($id) : new $model;
+        if (! $id) {
+            $row->status = 'draft';
+            if ($kind === 'assignments') {
+                $row->allow_text = true;
+            }
+            if ($kind === 'lessons') {
+                $row->position = 1 + (int) $classroom->lessons()->max('position');
+            }
+        }
 
         return view('classes.form', compact('classroom', 'kind', 'fields', 'row'));
     }
@@ -82,7 +94,7 @@ class ClassController extends Controller
         });
         if ($publish && in_array($kind, ['assignments', 'quizzes'])) {
             foreach ($classroom->enrollments()->with('student.user')->get() as $enrollment) {
-                $enrollment->student->user?->notify(new PortalNotice('New '.\Illuminate\Support\Str::singular($kind), $row->title, '/classes/'.$classroom->id));
+                $enrollment->student->user?->notify(new PortalNotice('New '.Str::singular($kind), $row->title, '/classes/'.$classroom->id));
             }
         }
 
@@ -113,9 +125,27 @@ class ClassController extends Controller
         Access::classroom($r->user(), $assignment->classroom);
         $student = $r->user()->role === 'student';
         abort_if($student && $assignment->status !== 'published', 404);
-        $submissions = $assignment->submissions()->with('student.user')->when($student, fn ($q) => $q->where('student_id', $r->user()->student->id))->latest('id')->get();
+        $assignment->load('classroom.block.program', 'classroom.subject', 'classroom.teacher.user');
+        $query = $assignment->submissions()->with('student.user')->when($student, fn ($q) => $q->where('student_id', $r->user()->student->id));
+        if (! config('lms.show_advanced_features')) {
+            $query->whereIn('id', AssignmentSubmission::selectRaw('MAX(id)')->where('assignment_id', $assignment->id)->groupBy('student_id'));
+        }
+        $submissions = $query->latest('id')->get();
+        $enrollments = $student ? collect() : $assignment->classroom->enrollments()->with('student.user')->get();
+        if (! $student) {
+            $enrolledIds = $enrollments->pluck('student_id')->all();
+            foreach ($submissions->unique('student_id') as $submission) {
+                if (! in_array($submission->student_id, $enrolledIds)) {
+                    // A roster projection keeps existing work accessible after an enrollment is removed.
+                    $former = new Enrollment(['student_id' => $submission->student_id]);
+                    $former->setRelation('student', $submission->student);
+                    $former->setAttribute('former_enrollment', true);
+                    $enrollments->push($former);
+                }
+            }
+        }
 
-        return view('classes.assignment', compact('assignment', 'submissions', 'student'));
+        return view('classes.assignment', compact('assignment', 'submissions', 'student', 'enrollments'));
     }
 
     public function submit(Request $r, Assignment $assignment)
@@ -140,15 +170,28 @@ class ClassController extends Controller
     public function grade(Request $r, AssignmentSubmission $submission)
     {
         Access::classroom($r->user(), $submission->assignment->classroom, true);
-        $data = $r->validate(['score' => 'required|numeric|min:0|max:'.$submission->assignment->total_points, 'feedback' => 'nullable|string|max:10000', 'status' => 'required|in:graded,returned']);
-        DB::transaction(function () use ($submission, $data) {
-            $submission->update($data + ['graded_at' => now()]);
-            $latest = $submission->assignment->submissions()->where('student_id', $submission->student_id)->whereNotNull('graded_at')->orderByDesc('version')->first();
-            Grade::updateOrCreate(['student_id' => $submission->student_id, 'source_type' => 'assignment', 'source_id' => $submission->assignment_id], ['teacher_assignment_id' => $submission->assignment->teacher_assignment_id, 'title' => $submission->assignment->title, 'score' => $latest->score, 'total_points' => $submission->assignment->total_points]);
-        });
-        $submission->student->user?->notify(new PortalNotice('Assignment graded', $submission->assignment->title, '/assignments/'.$submission->assignment_id));
+        $data = $r->validate(AssignmentGrading::rules($submission->assignment));
+        AssignmentGrading::save($submission, $data);
+        AssignmentGrading::notify($submission);
 
         return back()->with('success', 'Score and feedback returned.');
+    }
+
+    public function bulkGrade(Request $r, Assignment $assignment)
+    {
+        Access::classroom($r->user(), $assignment->classroom, true);
+        $rules = ['grades' => 'required|array|min:1|max:500', 'grades.*' => 'required|array:score,feedback,status', 'expected_count' => 'nullable|integer|min:1|max:500'];
+        foreach (AssignmentGrading::rules($assignment, true) as $field => $rule) {
+            $rules['grades.*.'.$field] = ($r->filled('expected_count') ? 'present|' : '').$rule;
+        }
+        $data = $r->validate($rules, ['grades.*.score.present' => 'A grade field did not reach the server. No grades were changed. Ask an administrator to check the form-input limit.',
+            'grades.*.feedback.present' => 'A grade field did not reach the server. No grades were changed. Ask an administrator to check the form-input limit.']);
+        if ($r->filled('expected_count') && count($data['grades']) !== (int) $data['expected_count']) {
+            throw ValidationException::withMessages(['grades' => 'Not all grade rows reached the server. No grades were changed. Ask your administrator to check the server form-input limit.']);
+        }
+        $count = AssignmentGrading::saveMany($r->user(), $assignment, $data['grades']);
+
+        return back()->with('success', $count ? 'Grades saved for '.$count.' submissions.' : 'No grades changed. Enter a score for the submissions you want to grade.');
     }
 
     public function download(Request $r, string $kind, int $id)
@@ -162,10 +205,10 @@ class ClassController extends Controller
             [$model] = ClassContent::definition($kind);
             $row = $model::findOrFail($id);
             Access::classroom($r->user(), $row->classroom);
-            abort_if($r->user()->role === 'student' && $row->status !== 'published',404);
+            abort_if($r->user()->role === 'student' && $row->status !== 'published', 404);
         }
-        abort_unless($row->path && Storage::disk('local')->exists($row->path),404);
+        abort_unless($row->path && Storage::disk('local')->exists($row->path), 404);
 
-        return Storage::disk('local')->download($row->path,$row->original_name,['X-Content-Type-Options' => 'nosniff']);
+        return Storage::disk('local')->download($row->path, $row->original_name, ['X-Content-Type-Options' => 'nosniff']);
     }
 }
