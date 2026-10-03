@@ -1,4 +1,4 @@
-<p class="text-secondary">Assign each subject to a teacher and one or more blocks. Each block/subject pair can have one teacher. Up to 300 classes per setup.</p>
+<p class="text-secondary">Assign each subject to a teacher and choose its blocks by program and year level. Subjects are shared in the catalog; only the selected blocks receive each class. Each block/subject pair can have one teacher. Up to 300 classes per setup.</p>
 @if($teachers->isEmpty())
     <div class="alert alert-info">No teacher profiles available. <a href="/admin/manage/teachers/create">Add a teacher</a> before continuing.</div>
 @endif

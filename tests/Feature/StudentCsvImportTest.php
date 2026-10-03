@@ -208,4 +208,149 @@ class StudentCsvImportTest extends TestCase
         $this->assertNotEmpty(StudentCsvImport::validateRows([$row], ['Block A'])['errors'][0]);
         $this->assertStringContainsString('student@example.com', StudentCsvImport::template());
     }
+
+    private function scopedBlocks(): array
+    {
+        $blocks = [];
+        foreach ([['BSIT', 'Information Technology', 2, 'Second Year', '2A'], ['BSBA', 'Business Administration', 2, 'Second Year', '2A'], ['BSIT', 'Information Technology', 3, 'Third Year', '2A'], ['BSBA', 'Business Administration', 3, 'Third Year', '2A'], ['BSIT', 'Information Technology', 2, 'Second Year', '2B']] as $index => [$program, $programName, $level, $yearLevel, $name]) {
+            $blocks[$index] = ['index' => $index, 'name' => $name, 'program' => $program, 'program_name' => $programName, 'year_level' => $yearLevel, 'level' => $level, 'label' => $program.' — '.$yearLevel.' — Block '.$name];
+        }
+
+        return $blocks;
+    }
+
+    public function test_scoped_csv_resolves_repeated_block_names_by_program_and_year_level_without_writes(): void
+    {
+        Notification::fake();
+        Storage::fake('local');
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+        $csv = "\xEF\xBB\xBFStudent ID,Name,Email,Program,Year Level,Block\n"
+            ."S-1,IT Second,it2@example.com, bsit ,2,2a\n"
+            ."S-2,BA Second,ba2@example.com,Business Administration,second year,2A\n"
+            ."S-3,IT Third,it3@example.com,Information Technology,Third Year,2A\n"
+            ."S-4,BA Third,ba3@example.com,bsba,3,2A\n"
+            ."S-5,Unique Block,unique@example.com,,,2B\n";
+        $result = StudentCsvImport::preview($this->csv($csv), $this->scopedBlocks());
+        $queries = DB::getQueryLog();
+        DB::disableQueryLog();
+
+        $this->assertSame([], $result['errors']);
+        $this->assertSame(5, $result['valid_count']);
+        $this->assertSame([0, 1, 2, 3, 4], array_column($result['rows'], 'block_index'));
+        $this->assertSame(['2A', '2A', '2A', '2A', '2B'], array_column($result['rows'], 'block'));
+        $this->assertSame('bsit', $result['rows'][0]['program']);
+        $this->assertSame('2', $result['rows'][0]['year_level']);
+        $this->assertSame('BSIT — Second Year — Block 2A', $result['rows'][0]['block_label']);
+        $this->assertLessThanOrEqual(3, count($queries));
+        $this->assertTrue(collect($queries)->every(fn ($query) => str_starts_with(strtolower($query['query']), 'select')));
+        $this->assertDatabaseCount('users', 0);
+        $this->assertDatabaseCount('students', 0);
+        $this->assertDatabaseCount('enrollments', 0);
+        $this->assertDatabaseCount('jobs', 0);
+        $this->assertSame([], Storage::disk('local')->allFiles());
+        Notification::assertNothingSent();
+    }
+
+    public function test_unique_descriptor_name_supports_legacy_csv_and_preserves_target_index(): void
+    {
+        $target = $this->scopedBlocks()[4];
+        $target['index'] = 17;
+        $result = StudentCsvImport::preview($this->csv("student_id,name,email,block\nS-1,Unique,unique@example.com,2b\n"), [17 => $target]);
+
+        $this->assertSame([], $result['errors']);
+        $this->assertSame(17, $result['rows'][0]['block_index']);
+        $this->assertSame('', $result['rows'][0]['program']);
+        $this->assertSame('', $result['rows'][0]['year_level']);
+        $legacy = StudentCsvImport::preview($this->csv("student_id,name,email,block\nS-1,Unique,unique@example.com,Block B\n"), ['Block A', 'Block B']);
+        $this->assertSame(1, $legacy['rows'][0]['block_index']);
+        $this->assertSame('Block B', $legacy['rows'][0]['block_label']);
+    }
+
+    public function test_ambiguous_scoped_block_requires_filters_and_lists_actual_choices(): void
+    {
+        foreach (["student_id,name,email,block\nS-1,Ambiguous,a@example.com,2A\n", "student_id,name,email,program,year_level,block\nS-1,Ambiguous,a@example.com,BSIT,,2A\n", "student_id,name,email,program,year_level,block\nS-1,Ambiguous,a@example.com,,2,2A\n"] as $csv) {
+            $result = StudentCsvImport::preview($this->csv($csv), $this->scopedBlocks());
+            $this->assertSame(0, $result['valid_count']);
+            $this->assertSame(1, $result['invalid_count']);
+            $this->assertNull($result['rows'][0]['block_index']);
+            $message = implode(' ', $result['errors'][2]);
+            $this->assertStringContainsString('ambiguous', $message);
+            $this->assertStringContainsString('Program and Year Level', $message);
+            $this->assertStringContainsString('BSIT — Second Year — Block 2A', $message);
+        }
+        $result = StudentCsvImport::preview($this->csv("student_id,name,email,block\nS-1,Ambiguous,a@example.com,2A\n"), $this->scopedBlocks());
+        $this->assertStringContainsString('BSBA — Third Year — Block 2A', implode(' ', $result['errors'][2]));
+    }
+
+    public function test_wrong_scoped_filters_never_fall_back_to_another_target(): void
+    {
+        foreach ([['BSCS', '2', '2A'], ['BSIT', '4', '2A'], ['BSIT', '2.0', '2A'], ['BSIT', 'First Year', '2A'], ['BSBA', '2', '2B']] as [$program, $level, $block]) {
+            $result = StudentCsvImport::preview($this->csv("student_id,name,email,program,year_level,block\nS-1,Mismatch,mismatch@example.com,$program,$level,$block\n"), $this->scopedBlocks());
+            $this->assertSame(0, $result['valid_count']);
+            $this->assertNull($result['rows'][0]['block_index']);
+            $this->assertSame('', $result['rows'][0]['block_label']);
+            $this->assertStringContainsString('does not match', implode(' ', $result['errors'][2]));
+        }
+        $result = StudentCsvImport::preview($this->csv("student_id,name,email,program,year_level,block\nS-1,Mismatch,mismatch@example.com,BSIT,2,missing\n"), $this->scopedBlocks());
+        $this->assertStringContainsString('Block must match', implode(' ', $result['errors'][2]));
+    }
+
+    public function test_scoped_revalidation_recomputes_block_index_label_and_account_ids(): void
+    {
+        $row = ['row' => 2, 'student_number' => 'S-1', 'name' => 'Student', 'email' => 'student@example.com', 'program' => 'BSIT', 'year_level' => 'Second Year', 'block' => '2A', 'block_index' => 3, 'block_label' => 'Forged placement', 'existing_user_id' => 999, 'existing_student_id' => 999];
+        $result = StudentCsvImport::validateRows([$row], $this->scopedBlocks());
+        $this->assertSame([], $result['errors']);
+        $this->assertSame(0, $result['rows'][0]['block_index']);
+        $this->assertSame('BSIT — Second Year — Block 2A', $result['rows'][0]['block_label']);
+        $this->assertNull($result['rows'][0]['existing_user_id']);
+        $this->assertNull($result['rows'][0]['existing_student_id']);
+        $row['program'] = 'BSBA';
+        $row['year_level'] = '3';
+        $row['block_index'] = 0;
+        $result = StudentCsvImport::validateRows([$row], $this->scopedBlocks());
+        $this->assertSame(3, $result['rows'][0]['block_index']);
+        $row['program'] = '';
+        $row['year_level'] = '';
+        $result = StudentCsvImport::validateRows([$row], $this->scopedBlocks());
+        $this->assertNull($result['rows'][0]['block_index']);
+        $this->assertNotEmpty($result['errors'][2]);
+    }
+
+    public function test_duplicate_malformed_mixed_or_oversized_target_scopes_are_rejected(): void
+    {
+        $row = ['student_number' => 'S-1', 'name' => 'Student', 'email' => 'student@example.com', 'program' => 'BSIT', 'year_level' => '2', 'block' => '2A'];
+        $blocks = $this->scopedBlocks();
+        $duplicate = $blocks[0];
+        $duplicate['index'] = 5;
+        $duplicate['name'] = '2a';
+        $this->assertNotEmpty(StudentCsvImport::validateRows([$row], [$blocks[0], $duplicate])['errors'][0]);
+        $duplicate = $blocks[1];
+        $duplicate['index'] = 0;
+        $this->assertNotEmpty(StudentCsvImport::validateRows([$row], [$blocks[0], $duplicate])['errors'][0]);
+        $this->assertNotEmpty(StudentCsvImport::validateRows([$row], ['2A', $blocks[0]])['errors'][0]);
+        $malformed = $blocks[0];
+        unset($malformed['program']);
+        $this->assertNotEmpty(StudentCsvImport::validateRows([$row], [$malformed])['errors'][0]);
+        $this->assertNotEmpty(StudentCsvImport::validateRows([$row], array_fill(0, StudentCsvImport::MAX_BLOCKS + 1, $blocks[0]))['errors'][0]);
+        $row['program'] = ['BSIT'];
+        $this->assertNotEmpty(StudentCsvImport::validateRows([$row], $blocks)['errors'][2]);
+    }
+
+    public function test_scoped_columns_are_included_in_size_and_length_validation_and_template_is_safe(): void
+    {
+        $row = ['student_number' => 'S-1', 'name' => 'Student', 'email' => 'student@example.com', 'program' => str_repeat('x', 121), 'year_level' => str_repeat('x', 121), 'block' => '2A'];
+        $result = StudentCsvImport::validateRows([$row], $this->scopedBlocks());
+        $this->assertNotEmpty($result['errors'][2]);
+        $this->assertStringContainsString('120', implode(' ', $result['errors'][2]));
+        $row['program'] = str_repeat('x', StudentCsvImport::MAX_BYTES + 1);
+        $this->assertNotEmpty(StudentCsvImport::validateRows([$row], $this->scopedBlocks())['errors'][0]);
+        $this->assertSame(StudentCsvImport::template(), StudentCsvImport::template(false));
+        $this->assertStringStartsWith("student_id,name,email,program,year_level,block\r\n", StudentCsvImport::template(true));
+        $result = StudentCsvImport::preview($this->csv(StudentCsvImport::template(true)), $this->scopedBlocks());
+        $this->assertSame([], $result['errors']);
+        $this->assertSame(0, $result['rows'][0]['block_index']);
+        $this->assertSame('student@example.com', $result['rows'][0]['email']);
+        $this->assertDatabaseCount('users', 0);
+    }
 }

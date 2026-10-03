@@ -1,6 +1,4 @@
-@if(empty($programs->count()) || empty($yearLevels->count()))
-    <div class="alert alert-info">Create at least one <a href="/admin/manage/programs/create">Program</a> and <a href="/admin/manage/year-levels/create">Year Level</a> before starting.</div>
-@endif
+<p class="text-secondary">Choose the academic year and semester. Add programs, their year levels and blocks together in the next step.</p>
 @if(!empty($draft['source']))
     <div class="alert alert-info">Previous setup loaded. Choose a target year/semester. Student placement changes preserve earlier enrollments and academic history.</div>
     <label class="form-check mb-3"><input class="form-check-input" type="checkbox" name="copy_schedules" value="1" @checked($draft['copy_schedules'] ?? false)> <span class="form-check-label">Copy basic schedules</span></label>
@@ -13,6 +11,4 @@
         <div class="col-md-3"><label for="starts_on" class="form-label">Starts On</label><input class="form-control" type="date" id="starts_on" name="starts_on" value="{{ old('starts_on', $draft['starts_on'] ?? '') }}" data-new-year-required></div>
         <div class="col-md-3"><label for="ends_on" class="form-label">Ends On</label><input class="form-control" type="date" id="ends_on" name="ends_on" value="{{ old('ends_on', $draft['ends_on'] ?? '') }}" data-new-year-required></div>
     </div></div>
-    <div class="col-md-6"><label for="program_id" class="form-label">Program</label><select class="form-select" id="program_id" name="program_id" required><option value="">Choose program</option>@foreach($programs as $program)<option value="{{ $program->id }}" @selected((string)old('program_id', $draft['program_id'] ?? '') === (string)$program->id)>{{ $program->code }} — {{ $program->name }}</option>@endforeach</select></div>
-    <div class="col-md-6"><label for="year_level_id" class="form-label">Year Level</label><select class="form-select" id="year_level_id" name="year_level_id" required><option value="">Choose year level</option>@foreach($yearLevels as $level)<option value="{{ $level->id }}" @selected((string)old('year_level_id', $draft['year_level_id'] ?? '') === (string)$level->id)>{{ $level->name }}</option>@endforeach</select></div>
 </div>

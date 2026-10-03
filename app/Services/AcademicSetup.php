@@ -7,11 +7,13 @@ use App\Models\AcademicYear;
 use App\Models\Block;
 use App\Models\ClassSchedule;
 use App\Models\Enrollment;
+use App\Models\Program;
 use App\Models\Student;
 use App\Models\Subject;
 use App\Models\Teacher;
 use App\Models\TeacherAssignment;
 use App\Models\User;
+use App\Models\YearLevel;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
@@ -31,7 +33,7 @@ class AcademicSetup
                 'academic_year_name' => 'required_without:academic_year_id|nullable|string|max:120',
                 'starts_on' => 'required_without:academic_year_id|nullable|date',
                 'ends_on' => 'required_without:academic_year_id|nullable|date|after:starts_on',
-                'semester' => 'required|integer|in:1,2,3', 'program_id' => 'required|integer|exists:programs,id', 'year_level_id' => 'required|integer|exists:year_levels,id',
+                'semester' => 'required|integer|in:1,2,3', 'program_id' => 'nullable|integer|exists:programs,id', 'year_level_id' => 'nullable|integer|exists:year_levels,id',
             ],
             2 => ['blocks' => 'required|array|min:1|max:30', 'blocks.*.name' => 'bail|required|string|max:120|distinct:ignore_case'],
             3 => ['subjects' => 'required|array|min:1|max:50', 'subjects.*.id' => 'nullable|integer', 'subjects.*.code' => 'bail|required|string|max:120|distinct:ignore_case', 'subjects.*.name' => 'required|string|max:120', 'subjects.*.units' => 'required|integer|min:1|max:12'],
@@ -48,7 +50,7 @@ class AcademicSetup
             }
         }
         if ($step === 2) {
-            $input['blocks'] = array_values(array_map(fn ($row) => ['name' => is_string($row['name'] ?? null) ? trim($row['name']) : ($row['name'] ?? '')], $input['blocks'] ?? []));
+            return self::normalizeStep2($input);
         }
         if ($step === 3) {
             $input['subjects'] = array_values(array_map(fn ($row) => ['id' => $row['id'] ?? null, 'code' => is_string($row['code'] ?? null) ? trim($row['code']) : ($row['code'] ?? ''), 'name' => is_string($row['name'] ?? null) ? trim($row['name']) : ($row['name'] ?? ''), 'units' => $row['units'] ?? null], $input['subjects'] ?? []));
@@ -83,11 +85,162 @@ class AcademicSetup
         return $data;
     }
 
+    public static function normalizeStep2(array $input): array
+    {
+        if (! array_key_exists('structures', $input)) {
+            $rows = $input['blocks'] ?? [];
+            if (! is_array($rows) || count(array_filter($rows, 'is_array')) !== count($rows)) {
+                throw ValidationException::withMessages(['blocks' => 'Provide a valid list of setup rows.']);
+            }
+            $blocks = array_values(array_map(fn ($row) => ['name' => is_string($row['name'] ?? null) ? trim($row['name']) : ($row['name'] ?? '')], $rows));
+            $data = Validator::make(['blocks' => $blocks], self::rules(2))->validate();
+            // Old step requests contain names only; their saved Step 1 scope is added on review.
+            if (! array_key_exists('program_id', $input) && ! array_key_exists('year_level_id', $input)) {
+                return $data;
+            }
+            $scope = Validator::make($input, ['program_id' => 'required|integer', 'year_level_id' => 'required|integer'])->validate();
+            $input['structures'] = [['program_id' => $scope['program_id'], 'year_levels' => [['year_level_id' => $scope['year_level_id'], 'blocks' => $blocks]]]];
+        }
+        $validated = Validator::make($input, [
+            'structures' => 'required|array|min:1|max:20',
+            'structures.*' => 'required|array:program_id,year_levels,expected_level_count',
+            'structures.*.program_id' => 'required|integer|distinct',
+            'structures.*.year_levels' => 'required|array|min:1|max:12',
+            'structures.*.year_levels.*' => 'required|array:year_level_id,name,level,blocks,expected_block_count',
+            'structures.*.year_levels.*.year_level_id' => 'nullable|integer',
+            'structures.*.year_levels.*.name' => 'nullable|string|max:120',
+            'structures.*.year_levels.*.level' => 'nullable|integer|min:1|max:12',
+            'structures.*.year_levels.*.blocks' => 'required|array|min:1|max:30',
+            'structures.*.year_levels.*.blocks.*' => 'required|array:name',
+            'structures.*.year_levels.*.blocks.*.name' => 'required|string|max:120',
+        ])->validate();
+        self::checkStructureCounts($input);
+        $groups = array_values($validated['structures']);
+        $programs = Program::whereIn('id', array_column($groups, 'program_id'))->get(['id', 'code', 'name'])->keyBy('id');
+        $levels = YearLevel::get(['id', 'name', 'level']);
+        $byId = $levels->keyBy('id');
+        $byOrdinal = $levels->keyBy('level');
+        $newNames = [];
+        $newLevels = [];
+        $blocks = [];
+        $keys = [];
+        foreach ($groups as $groupIndex => &$group) {
+            if (! $programs->has($group['program_id'])) {
+                throw ValidationException::withMessages(["structures.$groupIndex.program_id" => 'Select an existing program.']);
+            }
+            $group['program_id'] = (int) $group['program_id'];
+            $group['year_levels'] = array_values($group['year_levels']);
+            $seenLevels = [];
+            foreach ($group['year_levels'] as $levelIndex => &$level) {
+                $field = "structures.$groupIndex.year_levels.$levelIndex";
+                $existing = ! empty($level['year_level_id']) ? $byId->get($level['year_level_id']) : null;
+                if (! empty($level['year_level_id']) && ! $existing) {
+                    throw ValidationException::withMessages([$field.'.year_level_id' => 'Select an existing year level.']);
+                }
+                if (! $existing) {
+                    $newValidator = Validator::make(['name' => is_string($level['name'] ?? null) ? trim($level['name']) : ($level['name'] ?? null), 'level' => $level['level'] ?? null],
+                        ['name' => 'required|string|max:120', 'level' => 'required|integer|min:1|max:12']);
+                    if ($newValidator->fails()) {
+                        throw ValidationException::withMessages(collect($newValidator->errors()->messages())->mapWithKeys(fn ($messages, $key) => [$field.'.'.$key => $messages])->all());
+                    }
+                    $new = $newValidator->validated();
+                    $existing = $byOrdinal->get($new['level']);
+                    if (! $existing) {
+                        $ordinal = (int) $new['level'];
+                        $name = $newLevels[$ordinal] ?? $new['name'];
+                        if ($levels->contains(fn ($row) => Str::lower($row->name) === Str::lower($name)) || isset($newNames[Str::lower($name)]) && $newNames[Str::lower($name)] !== $ordinal) {
+                            throw ValidationException::withMessages([$field.'.name' => 'This year level name belongs to another level number. Select the existing year level or use a different name.']);
+                        }
+                        $newLevels[$ordinal] = $name;
+                        $newNames[Str::lower($name)] = $ordinal;
+                    }
+                }
+                $ordinal = $existing ? (int) $existing->level : (int) $new['level'];
+                if (isset($seenLevels[$ordinal])) {
+                    throw ValidationException::withMessages([$field.'.year_level_id' => 'Add each year level only once per program. Add its blocks to the existing group.']);
+                }
+                $seenLevels[$ordinal] = true;
+                $names = array_values(array_map(fn ($row) => ['name' => trim($row['name'])], $level['blocks']));
+                $level = ['year_level_id' => $existing?->id, 'name' => $existing?->name ?? $newLevels[$ordinal], 'level' => $ordinal, 'blocks' => $names];
+                foreach ($names as $row) {
+                    if ($row['name'] === '') {
+                        throw ValidationException::withMessages([$field.'.blocks' => 'Every block needs a name.']);
+                    }
+                    $key = $group['program_id'].':'.$ordinal.':'.Str::lower($row['name']);
+                    if (isset($keys[$key])) {
+                        throw ValidationException::withMessages([$field.'.blocks' => 'Block names must be unique within the same program and year level.']);
+                    }
+                    $keys[$key] = true;
+                    $blocks[] = ['name' => $row['name'], 'program_id' => $group['program_id'], 'year_level_id' => $level['year_level_id'],
+                        'new_name' => $existing ? null : $level['name'], 'new_level' => $existing ? null : $ordinal, 'group' => $groupIndex, 'year_level_group' => $levelIndex];
+                }
+            }
+            unset($level);
+            unset($group['expected_level_count']);
+        }
+        unset($group);
+        if (count($blocks) > 30) {
+            throw ValidationException::withMessages(['blocks' => 'Create at most 30 blocks across all programs and year levels per setup.']);
+        }
+
+        return ['structures' => $groups, 'blocks' => $blocks];
+    }
+
+    private static function checkStructureCounts(array $input): void
+    {
+        $hasCounts = array_key_exists('expected_structure_count', $input);
+        foreach ($input['structures'] ?? [] as $group) {
+            $hasCounts = $hasCounts || array_key_exists('expected_level_count', $group);
+            foreach ($group['year_levels'] ?? [] as $level) {
+                $hasCounts = $hasCounts || array_key_exists('expected_block_count', $level);
+            }
+        }
+        if (! $hasCounts) {
+            return;
+        }
+        $counts = Validator::make($input, ['expected_structure_count' => 'required|integer|min:1|max:20',
+            'structures.*.expected_level_count' => 'required|integer|min:1|max:12', 'structures.*.year_levels.*.expected_block_count' => 'required|integer|min:1|max:30'])->validate();
+        $complete = (int) $counts['expected_structure_count'] === count($input['structures']);
+        foreach ($input['structures'] as $group) {
+            $complete = $complete && (int) $group['expected_level_count'] === count($group['year_levels']);
+            foreach ($group['year_levels'] as $level) {
+                $complete = $complete && (int) $level['expected_block_count'] === count($level['blocks']);
+            }
+        }
+        if (! $complete) {
+            throw ValidationException::withMessages(['structures' => 'Not all program, year level or block rows reached the server. Nothing was created. Reload the form and check the server form-input limit.']);
+        }
+    }
+
+    public static function blockChoices(array $draft): array
+    {
+        $blocks = $draft['blocks'] ?? [];
+        $programIds = array_map(fn ($row) => $row['program_id'] ?? $draft['program_id'] ?? null, $blocks);
+        $levelIds = array_map(fn ($row) => $row['year_level_id'] ?? $draft['year_level_id'] ?? null, $blocks);
+        $programs = Program::whereIn('id', array_filter($programIds))->get(['id', 'code', 'name'])->keyBy('id');
+        $levels = YearLevel::whereIn('id', array_filter($levelIds))->get(['id', 'name', 'level'])->keyBy('id');
+        $choices = [];
+        foreach ($blocks as $index => $block) {
+            $program = $programs->get($programIds[$index]);
+            // Explicit new levels must not fall back to a legacy top-level selection.
+            $level = ! empty($block['new_level']) ? null : $levels->get($levelIds[$index]);
+            $levelName = $level?->name ?? $block['new_name'] ?? null;
+            $ordinal = $level?->level ?? $block['new_level'] ?? null;
+            if (! $program || ! $levelName || ! $ordinal) {
+                throw ValidationException::withMessages(['blocks' => 'Choose a program and year level for every block before continuing.']);
+            }
+            $choices[$index] = ['index' => $index, 'name' => $block['name'], 'program' => $program->code, 'program_name' => $program->name,
+                'year_level' => $levelName, 'level' => (int) $ordinal, 'label' => $program->code.' — '.$levelName.' — Block '.$block['name']];
+        }
+
+        return $choices;
+    }
+
     public static function validateDraft(array $draft): array
     {
         $data = [];
         for ($step = 1; $step <= 4; $step++) {
-            $data = array_merge($data, self::normalizeStep($step, $draft));
+            $data = array_merge($data, self::normalizeStep($step, array_merge($draft, $data)));
         }
         $pairs = [];
         $teachers = Teacher::whereIn('id', array_column($data['assignments'], 'teacher_id'))->with('user')->get()->keyBy('id');
@@ -119,7 +272,8 @@ class AcademicSetup
                 throw ValidationException::withMessages(['students' => 'Every selected student needs an available student account and a block from this setup.']);
             }
         }
-        $csv = empty($draft['csv_rows']) ? ['rows' => [], 'errors' => []] : StudentCsvImport::validateRows($draft['csv_rows'], array_column($data['blocks'], 'name'));
+        $blockChoices = self::blockChoices($data);
+        $csv = empty($draft['csv_rows']) ? ['rows' => [], 'errors' => []] : StudentCsvImport::validateRows($draft['csv_rows'], $blockChoices);
         if ($csv['errors']) {
             throw ValidationException::withMessages(['csv' => 'The CSV preview contains invalid or conflicting rows. Correct it before creating the setup.']);
         }
@@ -138,9 +292,8 @@ class AcademicSetup
         $data['source'] = empty($draft['source']) ? null : Validator::make($draft['source'], ['academic_year_id' => 'required|integer|exists:academic_years,id', 'semester' => 'required|integer|in:1,2,3', 'program_id' => 'required|integer|exists:programs,id', 'year_level_id' => 'required|integer|exists:year_levels,id'])->validate();
         $classCounts = array_count_values(array_map(fn ($pair) => explode(':', $pair)[0], array_keys($pairs)));
         $enrollmentCount = array_sum(array_map(fn ($row) => $classCounts[$row['block']] ?? 0, $students));
-        $blockIndexes = array_flip(array_map(fn ($name) => Str::lower($name), array_column($data['blocks'], 'name')));
         foreach ($csv['rows'] as $row) {
-            $enrollmentCount += $classCounts[$blockIndexes[Str::lower($row['block'])]] ?? 0;
+            $enrollmentCount += $classCounts[$row['block_index']] ?? 0;
         }
         if ($enrollmentCount > 10000) {
             throw ValidationException::withMessages(['students' => 'This setup would create more than 10,000 enrollments. Split enrollment into smaller batches.']);
@@ -178,9 +331,15 @@ class AcademicSetup
             $blockIndexes = $blocks->pluck('id')->flip();
             $students = $people->map(fn ($student) => ['id' => $student->id, 'block' => $blockIndexes[$student->block_id]])->all();
         }
+        $level = YearLevel::findOrFail($scope['year_level_id']);
 
         return [
-            'blocks' => $blocks->map(fn ($block) => ['name' => $block->name])->all(),
+            'program_id' => (int) $scope['program_id'], 'year_level_id' => (int) $scope['year_level_id'],
+            'structures' => [['program_id' => (int) $scope['program_id'], 'year_levels' => [['year_level_id' => (int) $scope['year_level_id'],
+                'name' => $level->name, 'level' => $level->level,
+                'blocks' => $blocks->map(fn ($block) => ['name' => $block->name])->all()]]]],
+            'blocks' => $blocks->map(fn ($block) => ['name' => $block->name, 'program_id' => $block->program_id, 'year_level_id' => $block->year_level_id,
+                'new_name' => null, 'new_level' => null, 'group' => 0, 'year_level_group' => 0])->all(),
             'subjects' => $subjects->map(fn ($subject) => ['id' => $subject->id, 'code' => $subject->code, 'name' => $subject->name, 'units' => $subject->units])->all(),
             'assignments' => array_values($assignments), 'students' => $students,
             'source' => $scope, 'source_block_ids' => $blocks->pluck('id')->all(), 'copy_schedules' => $copySchedules,
@@ -194,16 +353,22 @@ class AcademicSetup
             $year = ($data['academic_year_id'] ?? null)
                 ? AcademicYear::whereKey($data['academic_year_id'])->lockForUpdate()->firstOrFail()
                 : AcademicYear::create(['name' => trim($data['academic_year_name']), 'starts_on' => $data['starts_on'], 'ends_on' => $data['ends_on']]);
-            if (Block::where('academic_year_id', $year->id)->where('program_id', $data['program_id'])->where('year_level_id', $data['year_level_id'])->where('semester', $data['semester'])->whereIn(DB::raw('LOWER(name)'), array_map(fn ($row) => Str::lower($row['name']), $data['blocks']))->exists()) {
+            self::resolveBlockLevels($data);
+            $blockQuery = Block::where('academic_year_id', $year->id)->where('semester', $data['semester'])->where(function ($query) use ($data) {
+                foreach ($data['blocks'] as $row) {
+                    $query->orWhere(fn ($scope) => $scope->where('program_id', $row['program_id'])->where('year_level_id', $row['year_level_id'])->whereRaw('LOWER(name) = ?', [Str::lower($row['name'])]));
+                }
+            });
+            if ((clone $blockQuery)->exists()) {
                 throw ValidationException::withMessages(['blocks' => 'One or more target blocks already exist for this academic year, semester, program and year level. Change the names or correct them on the management pages.']);
             }
             // These catalog models have no creation hooks. Batch writes avoid one
             // database round trip for every block, subject and assigned class.
             $now = now();
-            $blockScope = ['academic_year_id' => $year->id, 'program_id' => $data['program_id'], 'year_level_id' => $data['year_level_id'], 'semester' => $data['semester']];
-            Block::insert(array_map(fn ($row) => $blockScope + ['name' => $row['name'], 'created_at' => $now, 'updated_at' => $now], $data['blocks']));
-            $blockMap = Block::where($blockScope)->whereIn('name', array_column($data['blocks'], 'name'))->get()->keyBy('name');
-            $blocks = array_map(fn ($row) => $blockMap->get($row['name']), $data['blocks']);
+            $blockScope = ['academic_year_id' => $year->id, 'semester' => $data['semester']];
+            Block::insert(array_map(fn ($row) => $blockScope + ['program_id' => $row['program_id'], 'year_level_id' => $row['year_level_id'], 'name' => $row['name'], 'created_at' => $now, 'updated_at' => $now], $data['blocks']));
+            $blockMap = $blockQuery->get()->keyBy(fn ($block) => self::blockKey($block->program_id, $block->year_level_id, $block->name));
+            $blocks = array_map(fn ($row) => $blockMap->get(self::blockKey($row['program_id'], $row['year_level_id'], $row['name'])), $data['blocks']);
             $newSubjects = array_filter($data['subjects'], fn ($row) => ! $row['id']);
             if ($newSubjects) {
                 Subject::insert(array_map(fn ($row) => ['code' => $row['code'], 'name' => $row['name'], 'units' => $row['units'], 'status' => 'active', 'created_at' => $now, 'updated_at' => $now], array_values($newSubjects)));
@@ -231,16 +396,56 @@ class AcademicSetup
         }, 3);
     }
 
+    private static function blockKey(int $programId, int $levelId, string $name): string
+    {
+        return $programId.':'.$levelId.':'.Str::lower($name);
+    }
+
+    private static function resolveBlockLevels(array &$data): void
+    {
+        $new = [];
+        foreach ($data['blocks'] as $block) {
+            if (! $block['year_level_id']) {
+                $new[(int) $block['new_level']] = $block['new_name'];
+            }
+        }
+        if (! $new) {
+            return;
+        }
+        $existing = YearLevel::whereIn('level', array_keys($new))->lockForUpdate()->get()->keyBy('level');
+        $missing = array_diff_key($new, $existing->all());
+        if ($missing) {
+            if (YearLevel::whereIn(DB::raw('LOWER(name)'), array_map(fn ($name) => Str::lower($name), array_values($missing)))->exists()) {
+                throw ValidationException::withMessages(['structures' => 'A new year level name now belongs to another level. Review the available year levels and try again.']);
+            }
+            $now = now();
+            YearLevel::insert(array_map(fn ($ordinal, $name) => ['level' => $ordinal, 'name' => $name, 'created_at' => $now, 'updated_at' => $now], array_keys($missing), array_values($missing)));
+            $existing = YearLevel::whereIn('level', array_keys($new))->get()->keyBy('level');
+        }
+        foreach ($data['blocks'] as &$block) {
+            if (! $block['year_level_id']) {
+                $block['year_level_id'] = $existing[$block['new_level']]->id;
+            }
+        }
+        unset($block);
+    }
+
     private static function copySchedules(array $data, array $draft, array $blocks, array $classes): int
     {
         if (! $data['copy_schedules'] || ! $data['source']) {
             return 0;
         }
         // Re-query the source scope; client fields and stale source IDs cannot select other records.
-        $sourceBlocks = Block::where($data['source'])->orderBy('id')->limit(30)->pluck('id')->all();
+        $sourceRows = Block::where($data['source'])->orderBy('id')->limit(30)->get();
+        $sourceBlocks = $sourceRows->pluck('id')->all();
         $sourceIds = $draft['source_block_ids'] ?? $sourceBlocks;
-        if (! is_array($sourceIds) || count($sourceIds) !== count($blocks) || count(array_unique($sourceIds)) !== count($sourceIds) || array_diff($sourceIds, $sourceBlocks)) {
+        if (! is_array($sourceIds) || count($sourceIds) !== count($blocks) || array_map('intval', $sourceIds) !== $sourceBlocks) {
             throw ValidationException::withMessages(['schedules' => 'Copied blocks changed. Load the previous setup again or turn off Copy Schedules before saving.']);
+        }
+        foreach ($blocks as $index => $block) {
+            if ((int) $block->program_id !== (int) $sourceRows[$index]->program_id || (int) $block->year_level_id !== (int) $sourceRows[$index]->year_level_id) {
+                throw ValidationException::withMessages(['schedules' => 'The copied program or year level changed. Turn off Copy Schedules or reload the previous setup before saving.']);
+            }
         }
         $mapping = array_flip($sourceIds);
         $schedules = ClassSchedule::whereHas('classroom', fn ($q) => $q->whereIn('block_id', $sourceBlocks))->with('classroom')->orderBy('id')->limit(301)->get();
@@ -268,7 +473,6 @@ class AcademicSetup
     private static function enroll(array $data, array $blocks, array $classes): array
     {
         $now = now();
-        $blockIndexes = array_flip(array_map(fn ($block) => Str::lower($block->name), $blocks));
         $selection = [];
         $studentIds = array_column($data['students'], 'id');
         $studentIds = array_merge($studentIds, array_filter(array_column($data['csv_rows'], 'existing_student_id')));
@@ -291,7 +495,7 @@ class AcademicSetup
             if (! $row['existing_user_id']) {
                 $newUserIds[] = $user->id;
             }
-            $selection[] = ['student_id' => $row['existing_student_id'], 'user_id' => $user->id, 'student_number' => $row['student_number'], 'block' => $blockIndexes[Str::lower($row['block'])]];
+            $selection[] = ['student_id' => $row['existing_student_id'], 'user_id' => $user->id, 'student_number' => $row['student_number'], 'block' => $row['block_index']];
         }
         $newProfiles = [];
         $moves = [];

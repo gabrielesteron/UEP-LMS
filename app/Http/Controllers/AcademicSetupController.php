@@ -45,7 +45,7 @@ class AcademicSetupController extends Controller
             return redirect('/admin/setup?step='.($draft['completed'] + 1));
         }
         $data = ['draft' => $draft, 'step' => $step, 'steps' => AcademicSetup::STEPS];
-        if ($step === 1 || $step === 6) {
+        if (in_array($step, [1, 2, 6], true)) {
             $data += ['academicYears' => AcademicYear::orderByDesc('starts_on')->limit(200)->get(), 'programs' => Program::orderBy('name')->limit(200)->get(), 'yearLevels' => YearLevel::orderBy('level')->limit(200)->get()];
         }
         if ($step === 3) {
@@ -54,8 +54,11 @@ class AcademicSetupController extends Controller
         if ($step === 4 || $step === 6) {
             $data['teachers'] = Teacher::with('user')->whereHas('user', fn ($q) => $q->where('role', 'teacher'))->orderBy('id')->limit(1000)->get();
         }
+        if ($step >= 4) {
+            $data['blockChoices'] = AcademicSetup::blockChoices($draft);
+        }
         if ($step === 5) {
-            $data['students'] = Student::with(['user', 'block'])->whereHas('user', function ($q) use ($request) {
+            $data['students'] = Student::with(['user', 'block.program', 'block.yearLevel'])->whereHas('user', function ($q) use ($request) {
                 $q->where('role', 'student');
                 if ($request->filled('q')) {
                     $q->where(fn ($q) => $q->where('name', 'like', '%'.$request->string('q')->limit(100).'%')->orWhere('email', 'like', '%'.$request->string('q')->limit(100).'%'));
@@ -80,6 +83,7 @@ class AcademicSetupController extends Controller
             $draft['review_hash'] = hash('sha256', json_encode($draft));
             $request->session()->put('academic_setup', $draft);
             $data['draft'] = $draft;
+            $data['blockChoices'] = AcademicSetup::blockChoices($draft);
             $data['studentCount'] = count($validated['students']) + count($validated['csv_rows']);
             $data['newAccountCount'] = count(array_filter($validated['csv_rows'], fn ($row) => ! $row['existing_user_id']));
         }
@@ -96,21 +100,33 @@ class AcademicSetupController extends Controller
         }
         unset($draft['review_hash']);
         if ($step <= 4) {
-            $normalized = AcademicSetup::normalizeStep($step, $request->all());
+            $input = $request->all();
+            if ($step === 2 && ! array_key_exists('structures', $input)) {
+                // Keep unfinished single-program drafts and existing clients compatible.
+                $input += ['program_id' => $draft['program_id'] ?? null, 'year_level_id' => $draft['year_level_id'] ?? null];
+            }
+            $normalized = AcademicSetup::normalizeStep($step, $input);
             if ($step === 4) {
                 AcademicSetup::validateDraft(array_merge($draft, $normalized, ['students' => [], 'csv_rows' => []]));
             }
             if ($step <= $draft['completed']) {
                 // Downstream choices refer to row indexes; discard them when earlier rows change.
-                foreach ([2 => ['blocks', 'source_block_ids', 'copy_schedules'], 3 => ['subjects'], 4 => ['assignments'], 5 => ['students', 'csv_rows', 'csv_preview']] as $later => $keys) {
+                foreach ([2 => ['structures', 'blocks', 'source_block_ids', 'copy_schedules'], 3 => ['subjects'], 4 => ['assignments'], 5 => ['students', 'csv_rows', 'csv_preview']] as $later => $keys) {
                     if ($later > $step) {
                         foreach ($keys as $key) {
                             unset($draft[$key]);
                         }
                     }
                 }
-                if ($step === 2 && isset($draft['source_block_ids']) && count($normalized['blocks']) !== count($draft['source_block_ids'])) {
-                    unset($draft['source_block_ids'], $draft['copy_schedules']);
+                if ($step === 2 && isset($draft['source_block_ids'])) {
+                    $scope = fn ($blocks) => array_map(fn ($block) => [
+                        $block['program_id'] ?? $draft['program_id'] ?? null,
+                        $block['year_level_id'] ?? $draft['year_level_id'] ?? null,
+                        $block['new_level'] ?? null,
+                    ], $blocks);
+                    if (count($normalized['blocks']) !== count($draft['source_block_ids']) || $scope($normalized['blocks']) !== $scope($draft['blocks'])) {
+                        unset($draft['source_block_ids'], $draft['copy_schedules']);
+                    }
                 }
                 $draft['completed'] = $step;
             }
@@ -133,7 +149,7 @@ class AcademicSetupController extends Controller
             if ($request->input('action') === 'clear_csv') {
                 unset($draft['csv_preview'], $draft['csv_rows']);
             } elseif ($request->hasFile('csv_file')) {
-                $draft['csv_preview'] = StudentCsvImport::preview($request->file('csv_file'), array_column($draft['blocks'], 'name'));
+                $draft['csv_preview'] = StudentCsvImport::preview($request->file('csv_file'), AcademicSetup::blockChoices($draft));
                 $draft['csv_rows'] = $draft['csv_preview']['rows'];
             }
             $request->session()->put('academic_setup', $draft);
@@ -197,8 +213,8 @@ class AcademicSetupController extends Controller
         return redirect('/admin/setup')->with('success', 'Setup draft cleared. Saved records were not changed.');
     }
 
-    public function template()
+    public function template(Request $request)
     {
-        return response(StudentCsvImport::template(), 200, ['Content-Type' => 'text/csv; charset=UTF-8', 'Content-Disposition' => 'attachment; filename="uep-student-template.csv"']);
+        return response(StudentCsvImport::template($request->boolean('scoped')), 200, ['Content-Type' => 'text/csv; charset=UTF-8', 'Content-Disposition' => 'attachment; filename="uep-student-template.csv"']);
     }
 }

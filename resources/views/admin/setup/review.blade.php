@@ -3,13 +3,29 @@
     $teacherNames = $teachers->keyBy('id');
     $classCount = array_sum(array_map(fn($row) => count($row['blocks']), $draft['assignments']));
     $assignedBlocks = array_unique(array_merge(...array_column($draft['assignments'], 'blocks')));
+    $scopedBlocks = collect($blockChoices ?? collect($draft['blocks'])->map(function ($block, $index) use ($draft, $programs, $yearLevels) {
+        $program = $programs->firstWhere('id', $block['program_id'] ?? $draft['program_id'] ?? null);
+        $level = $yearLevels->firstWhere('id', $block['year_level_id'] ?? $draft['year_level_id'] ?? null);
+        return ['index' => $index, 'name' => $block['name'], 'program' => $program?->code ?? 'Program', 'program_name' => $program?->name ?? '', 'year_level' => $level?->name ?? $block['new_name'] ?? 'Year Level', 'level' => $level?->level ?? $block['new_level'] ?? '', 'label' => ($program?->code ?? 'Program').' / '.($level?->name ?? $block['new_name'] ?? 'Year Level').' / Block '.$block['name']];
+    }));
+    $blockLabels = $scopedBlocks->keyBy('index');
 @endphp
-<dl class="row"><dt class="col-sm-3">Academic Year</dt><dd class="col-sm-9">{{ $targetYear?->name ?? $draft['academic_year_name'] }}@if(!$targetYear) <span class="badge text-bg-info">New</span>@endif</dd><dt class="col-sm-3">Semester</dt><dd class="col-sm-9">{{ [1=>'First',2=>'Second',3=>'Summer'][$draft['semester']] }}</dd><dt class="col-sm-3">Program</dt><dd class="col-sm-9">{{ $programs->firstWhere('id', $draft['program_id'])?->name }}</dd><dt class="col-sm-3">Year Level</dt><dd class="col-sm-9">{{ $yearLevels->firstWhere('id', $draft['year_level_id'])?->name }}</dd><dt class="col-sm-3">Blocks</dt><dd class="col-sm-9">{{ implode(', ', array_column($draft['blocks'], 'name')) }}</dd><dt class="col-sm-3">Student Enrollment</dt><dd class="col-sm-9">{{ $studentCount }} students · {{ $newAccountCount }} new activation invitations</dd><dt class="col-sm-3">Schedules</dt><dd class="col-sm-9">{{ !empty($draft['copy_schedules']) ? 'Copy basic schedules; conflicts will prevent saving' : 'Set later through existing schedule management' }}</dd></dl>
+<dl class="row"><dt class="col-sm-3">Academic Year</dt><dd class="col-sm-9">{{ $targetYear?->name ?? $draft['academic_year_name'] ?? 'Selected academic year' }}@if(!$targetYear && !empty($draft['academic_year_name'])) <span class="badge text-bg-info">New</span>@endif</dd><dt class="col-sm-3">Semester</dt><dd class="col-sm-9">{{ [1=>'First',2=>'Second',3=>'Summer'][$draft['semester']] }}</dd><dt class="col-sm-3">Student Enrollment</dt><dd class="col-sm-9">{{ $studentCount }} students · {{ $newAccountCount }} new activation invitations</dd><dt class="col-sm-3">Schedules</dt><dd class="col-sm-9">{{ !empty($draft['copy_schedules']) ? 'Copy basic schedules; conflicts will prevent saving' : 'Set later through existing schedule management' }}</dd></dl>
+<h3 class="h5">Programs, Year Levels & Blocks</h3>
+<div class="row g-3 mb-4">
+    @foreach($scopedBlocks->groupBy('program') as $programBlocks)
+        <section class="col-md-6"><div class="border rounded p-3 h-100"><h4 class="h6">{{ $programBlocks->first()['program'] }} — {{ $programBlocks->first()['program_name'] }}</h4>
+            @foreach($programBlocks->groupBy('level') as $levelBlocks)
+                <div class="border-top mt-3 pt-3"><div class="fw-semibold">{{ $levelBlocks->first()['year_level'] }} @if(filled($levelBlocks->first()['level']))<span class="small text-secondary">(Level {{ $levelBlocks->first()['level'] }})</span>@endif</div><div class="mt-2">Blocks: {{ implode(', ', $levelBlocks->pluck('name')->all()) }}</div></div>
+            @endforeach
+        </div></section>
+    @endforeach
+</div>
 <h3 class="h5">{{ count($draft['subjects']) }} Subjects · {{ $classCount }} Classes</h3>
 <div class="table-responsive"><table class="table"><thead><tr><th>Subject</th><th>Units</th><th>Teacher</th><th>Blocks</th></tr></thead><tbody>
     @foreach($draft['assignments'] as $row)
         @php($subject = $draft['subjects'][$row['subject']])
-        <tr><td>{{ $subject['code'] }} — {{ $subject['name'] }}<div class="small text-secondary">{{ $subject['id'] ? 'Existing subject reused' : 'New subject' }}</div></td><td>{{ $subject['units'] }}</td><td>{{ $teacherNames->get($row['teacher_id'])?->user?->name }}</td><td>{{ implode(', ', array_map(fn($index) => $draft['blocks'][$index]['name'], $row['blocks'])) }}</td></tr>
+        <tr><td>{{ $subject['code'] }} — {{ $subject['name'] }}<div class="small text-secondary">{{ $subject['id'] ? 'Existing subject reused' : 'New subject' }}</div></td><td>{{ $subject['units'] }}</td><td>{{ $teacherNames->get($row['teacher_id'])?->user?->name }}</td><td>@foreach($row['blocks'] as $blockIndex)<div>{{ $blockLabels->get($blockIndex)['label'] ?? $draft['blocks'][$blockIndex]['name'] }}</div>@endforeach</td></tr>
     @endforeach
 </tbody></table></div>
 @if(count($assignedBlocks) < count($draft['blocks']))

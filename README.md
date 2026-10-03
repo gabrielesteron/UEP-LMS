@@ -4,6 +4,8 @@ A working university learning portal with Admin, Teacher and Student roles, buil
 
 The existing three-module interface now includes guided School Year Setup, CSV preview/enrollment, optional previous-setup copying, bulk attendance/grading, and focused student dashboards. See [workflow guide and verification report](docs/WORKFLOW_IMPROVEMENTS.md) for the complete Admin → Teacher → Student flow and queue-worker requirements.
 
+School Year Setup supports multiple Programs/Courses, independently selected year levels and blocks in the same academic year. See the [multi-program setup guide](docs/MULTI_PROGRAM_SETUP.md) for scoped assignments, enrollment and CSV placement.
+
 ## Included
 
 - Academic years, programs, year levels, semester-based blocks, student/teacher profiles, subjects, teacher assignments, automatic block enrollment and schedules with conflict checks.

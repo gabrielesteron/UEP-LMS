@@ -15,8 +15,8 @@ Implemented and verified on 3 October 2026 in the existing Laravel 12 / Blade / 
 
 Open **+ Set Up School Year** from the dashboard or Academic Management sidebar.
 
-1. Select an existing academic year or enter a new name and date range. Select semester, Program and Year Level.
-2. Add, rename or remove blocks on one screen.
+1. Select an existing academic year or enter a new name and date range. Select the semester.
+2. Select multiple Programs/Courses, add or reuse each program's Year Levels, and add blocks under each Year Level. Repeated block names in different program/year-level scopes are supported. See [Multi-program setup](MULTI_PROGRAM_SETUP.md).
 3. Select existing subjects or enter codes, names and whole-number units. An existing code reuses the shared subject without overwriting its details.
 4. Assign each subject to a teacher and one or more blocks. Each block/subject pair has one teacher.
 5. Select existing students or preview a CSV. Select the target block for each student.
@@ -42,7 +42,7 @@ Student ID,Name,Email,Block
 - UTF-8 comma-separated CSV; BOM and friendly header capitalization are supported.
 - Maximum 1 MB / 500 data rows. Preview is paginated at 50 rows.
 - Student ID maps to the existing `students.student_number`; Name maps to `users.name`.
-- Block must match a block in the draft.
+- Block must match a block in the draft. Optional Program and Year Level columns identify repeated block names; ambiguous placements are rejected. The scoped template includes both columns.
 - Preview checks required values, email format, malformed CSV, duplicate IDs/emails, unavailable blocks, existing identity mismatches, archived accounts and role conflicts.
 - Every row shows whether it invites a new student or reuses an existing matching account. Header/file errors and invalid rows block review and creation.
 - An existing matching student is reused. An existing student-role account without a profile can receive the missing profile; account details and authentication are preserved.

@@ -14,6 +14,8 @@ class StudentCsvImport
 
     public const MAX_BYTES = 1048576;
 
+    public const MAX_BLOCKS = 300;
+
     /** Preview only: never persist accounts, files, or invitations. */
     public static function preview(UploadedFile $file, array $blockNames): array
     {
@@ -75,6 +77,8 @@ class StudentCsvImport
                     'student_number' => $data['student_id'] ?? '',
                     'name' => $data['name'] ?? '',
                     'email' => $data['email'] ?? '',
+                    'program' => $data['program'] ?? '',
+                    'year_level' => $data['year_level'] ?? '',
                     'block' => $data['block'] ?? '',
                 ];
                 if (! $data) {
@@ -104,7 +108,7 @@ class StudentCsvImport
         }
         $bytes = 0;
         foreach ($rows as $row) {
-            foreach (['student_number', 'name', 'email', 'block'] as $field) {
+            foreach (['student_number', 'name', 'email', 'program', 'year_level', 'block'] as $field) {
                 $bytes += is_array($row) && is_string($row[$field] ?? null) ? strlen($row[$field]) : 0;
             }
             if ($bytes > self::MAX_BYTES) {
@@ -115,29 +119,18 @@ class StudentCsvImport
         return self::validate($rows, $blockNames, $errors);
     }
 
-    public static function template(): string
+    public static function template(bool $multiplePrograms = false): string
     {
+        if ($multiplePrograms) {
+            return "student_id,name,email,program,year_level,block\r\n2026-0001,Example Student,student@example.com,BSIT,2,2A\r\n";
+        }
+
         return "student_id,name,email,block\r\n2026-0001,Example Student,student@example.com,Block A\r\n";
     }
 
     private static function validate(array $input, array $blockNames, array $errors): array
     {
-        $blocks = [];
-        foreach ($blockNames as $name) {
-            if (! is_string($name) || trim($name) === '') {
-                $errors[0][] = 'Configure a non-empty name for each target block first.';
-
-                continue;
-            }
-            $key = self::key(trim($name));
-            if (isset($blocks[$key])) {
-                $errors[0][] = 'Target block names must be unique, ignoring letter case.';
-            }
-            $blocks[$key] = trim($name);
-        }
-        if (! $blocks) {
-            $errors[0][] = 'Configure at least one target block before importing students.';
-        }
+        $blocks = self::targetBlocks($blockNames, $errors);
 
         $rows = [];
         $identifiers = ['student_number' => [], 'email' => []];
@@ -151,9 +144,14 @@ class StudentCsvImport
                 $number = max(array_keys($rows)) + 1;
             }
             $row = ['row' => $number];
-            foreach (['student_number', 'name', 'email', 'block'] as $field) {
+            foreach (['student_number', 'name', 'email', 'program', 'year_level', 'block'] as $field) {
                 $row[$field] = is_string($data[$field] ?? null) ? trim($data[$field]) : '';
+                if (in_array($field, ['program', 'year_level'], true) && isset($data[$field]) && ! is_string($data[$field])) {
+                    $errors[$number][] = ($field === 'program' ? 'Program' : 'Year Level').' must be a text value.';
+                }
             }
+            $row['block_index'] = null;
+            $row['block_label'] = '';
             $row['email'] = self::key($row['email']);
             $row['existing_student_id'] = null;
             $row['existing_user_id'] = null;
@@ -163,17 +161,14 @@ class StudentCsvImport
                 'student_number' => ['required', 'string', 'max:120', 'not_regex:/[\x00-\x1F\x7F]/u'],
                 'name' => ['required', 'string', 'max:120', 'not_regex:/[\x00-\x1F\x7F]/u'],
                 'email' => ['required', 'email:rfc', 'max:255'],
+                'program' => ['nullable', 'string', 'max:120'],
+                'year_level' => ['nullable', 'string', 'max:120'],
                 'block' => ['required', 'string', 'max:120'],
-            ], [], ['student_number' => 'Student ID', 'name' => 'Name', 'email' => 'Email', 'block' => 'Block']);
+            ], [], ['student_number' => 'Student ID', 'name' => 'Name', 'email' => 'Email', 'program' => 'Program', 'year_level' => 'Year Level', 'block' => 'Block']);
             if ($validator->fails()) {
                 $errors[$number] = array_merge($errors[$number] ?? [], $validator->errors()->all());
             }
-            $blockKey = self::key($row['block']);
-            if ($row['block'] !== '' && ! isset($blocks[$blockKey])) {
-                $errors[$number][] = 'Block must match one of the blocks in this academic setup.';
-            } elseif (isset($blocks[$blockKey])) {
-                $row['block'] = $blocks[$blockKey];
-            }
+            self::resolveBlock($row, $blocks, $errors);
             foreach (['student_number', 'email'] as $field) {
                 $key = self::key($row[$field]);
                 if ($key !== '') {
@@ -234,6 +229,96 @@ class StudentCsvImport
         unset($row);
 
         return self::result(array_values($rows), $errors);
+    }
+
+    /** Both legacy names and scoped descriptors are trusted setup targets, never CSV data. */
+    private static function targetBlocks(array $targets, array &$errors): array
+    {
+        if (count($targets) > self::MAX_BLOCKS) {
+            $errors[0][] = 'Configure at most 300 target blocks for one student import.';
+            $targets = array_slice($targets, 0, self::MAX_BLOCKS, true);
+        }
+        $blocks = [];
+        $scopes = [];
+        $indices = [];
+        $legacy = count(array_filter($targets, 'is_string')) === count($targets);
+        $descriptors = count(array_filter($targets, 'is_array')) === count($targets);
+        if (! $legacy && ! $descriptors) {
+            $errors[0][] = 'Target blocks must use one consistent setup format.';
+
+            return [];
+        }
+        foreach ($targets as $key => $target) {
+            $index = $legacy ? (is_int($key) ? $key : count($blocks)) : ($target['index'] ?? $key);
+            $name = $legacy ? trim($target) : (is_string($target['name'] ?? null) ? trim($target['name']) : '');
+            if (filter_var($index, FILTER_VALIDATE_INT) === false || (int) $index < 0 || $name === '' || mb_strlen($name) > 120) {
+                $errors[0][] = 'Configure a valid index and a non-empty block name of at most 120 characters for each target block.';
+
+                continue;
+            }
+            $index = (int) $index;
+            $program = $legacy ? '' : (is_string($target['program'] ?? null) ? trim($target['program']) : '');
+            $programName = $legacy ? '' : (is_string($target['program_name'] ?? null) ? trim($target['program_name']) : '');
+            $yearLevel = $legacy ? '' : (is_string($target['year_level'] ?? null) ? trim($target['year_level']) : '');
+            $level = $legacy ? null : ($target['level'] ?? null);
+            if (! $legacy && ($program === '' || $programName === '' || $yearLevel === '' || max(mb_strlen($program), mb_strlen($programName), mb_strlen($yearLevel)) > 120 || filter_var($level, FILTER_VALIDATE_INT) === false || (int) $level < 1 || (int) $level > 12)) {
+                $errors[0][] = 'Each target block needs a valid Program and Year Level from this setup.';
+
+                continue;
+            }
+            $scope = json_encode([self::key($program), $level === null ? null : (int) $level, self::key($name)]);
+            if (isset($scopes[$scope])) {
+                $errors[0][] = $legacy ? 'Target block names must be unique, ignoring letter case.' : 'Each target block must have a unique Program, Year Level, and Block name.';
+            }
+            if (isset($indices[$index])) {
+                $errors[0][] = 'Target blocks must have unique setup indices.';
+            }
+            $scopes[$scope] = true;
+            $indices[$index] = true;
+            $label = $legacy ? $name : $program.' — '.$yearLevel.' — Block '.$name;
+            if (! $legacy && is_string($target['label'] ?? null) && trim($target['label']) !== '') {
+                $label = mb_substr(trim($target['label']), 0, 400);
+            }
+            $blocks[] = ['index' => $index, 'name' => $name, 'program' => $program, 'program_name' => $programName, 'year_level' => $yearLevel, 'level' => $level === null ? null : (int) $level, 'label' => $label];
+        }
+        if (! $blocks) {
+            $errors[0][] = 'Configure at least one target block before importing students.';
+        }
+
+        return $blocks;
+    }
+
+    private static function resolveBlock(array &$row, array $blocks, array &$errors): void
+    {
+        if ($row['block'] === '') {
+            return;
+        }
+        $byName = array_values(array_filter($blocks, fn ($block) => self::key($block['name']) === self::key($row['block'])));
+        if (! $byName) {
+            $errors[$row['row']][] = 'Block must match one of the blocks in this academic setup.';
+
+            return;
+        }
+        $matches = array_values(array_filter($byName, function ($block) use ($row) {
+            $program = self::key($row['program']);
+            $yearLevel = self::key($row['year_level']);
+            $programMatches = $program === '' || $program === self::key($block['program']) || $program === self::key($block['program_name']);
+            $levelMatches = $yearLevel === '' || $yearLevel === self::key($block['year_level']) || ($block['level'] !== null && ctype_digit($yearLevel) && (int) $yearLevel === $block['level']);
+
+            return $programMatches && $levelMatches;
+        }));
+        if (count($matches) === 1) {
+            $row['block'] = $matches[0]['name'];
+            $row['block_index'] = $matches[0]['index'];
+            $row['block_label'] = $matches[0]['label'];
+
+            return;
+        }
+        $choices = implode('; ', array_column(array_slice($matches ?: $byName, 0, 5), 'label'));
+        $more = count($matches ?: $byName) > 5 ? '; additional choices are listed in the setup' : '';
+        $errors[$row['row']][] = $matches
+            ? 'Block is ambiguous. Add Program and Year Level columns to identify the correct target. Choices: '.$choices.$more.'.'
+            : 'Program or Year Level does not match this Block in the academic setup. Choices: '.$choices.$more.'.';
     }
 
     private static function result(array $rows, array $errors): array

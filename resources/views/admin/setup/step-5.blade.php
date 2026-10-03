@@ -5,7 +5,7 @@
 @php($placements = collect($draft['students'] ?? [])->keyBy('id'))
 <div class="table-responsive"><table class="table align-middle"><thead><tr><th>Select</th><th>Student</th><th>Current Block</th><th>Target Block</th></tr></thead><tbody>
     @forelse($students as $student)
-        <tr><td><input type="hidden" name="visible_ids[]" value="{{ $student->id }}"><input class="form-check-input" aria-label="Enroll {{ $student->user->name }}" type="checkbox" name="selected[]" value="{{ $student->id }}" @checked($placements->has($student->id))></td><td><strong>{{ $student->user->name }}</strong><div class="small text-secondary">{{ $student->student_number }} · {{ $student->user->email }}</div></td><td>{{ $student->block?->name ?? 'No block' }}</td><td><select class="form-select" aria-label="Target block for {{ $student->user->name }}" name="placements[{{ $student->id }}]">@foreach($draft['blocks'] as $index=>$block)<option value="{{ $index }}" @selected((int)($placements->get($student->id)['block'] ?? 0) === $index)>{{ $block['name'] }}</option>@endforeach</select></td></tr>
+        <tr><td><input type="hidden" name="visible_ids[]" value="{{ $student->id }}"><input class="form-check-input" aria-label="Enroll {{ $student->user->name }}" type="checkbox" name="selected[]" value="{{ $student->id }}" @checked($placements->has($student->id))></td><td><strong>{{ $student->user->name }}</strong><div class="small text-secondary">{{ $student->student_number }} · {{ $student->user->email }}</div></td><td>@if($student->block){{ $student->block->program?->code }} / {{ $student->block->yearLevel?->name }} / Block {{ $student->block->name }}@else No block @endif</td><td><select class="form-select" aria-label="Target program, year level and block for {{ $student->user->name }}" name="placements[{{ $student->id }}]">@foreach($blockChoices ?? collect($draft['blocks'])->map(fn($block, $index) => ['index' => $index, 'label' => $block['name']]) as $block)<option value="{{ $block['index'] }}" @selected((int)($placements->get($student->id)['block'] ?? 0) === $block['index'])>{{ $block['label'] }}</option>@endforeach</select></td></tr>
     @empty
         <tr><td colspan="4">No students match this search. Use the CSV option to invite new students.</td></tr>
     @endforelse
@@ -14,17 +14,18 @@
 {{ $students->links() }}
 <hr class="my-4">
 <h3 class="h5">B. Preview Student CSV</h3>
-<p>Required columns: <strong>Student ID, Name, Email, Block</strong>. Block must match a block in this setup. UTF-8 comma-separated CSV, maximum 1 MB / 500 rows. Existing matching accounts are reused.</p>
-<p><a href="/admin/setup/template" class="btn btn-sm btn-outline-secondary">Download CSV Template</a></p>
+<p>Required columns: <strong>Student ID, Name, Email, Block</strong>. Add <strong>Program</strong> and <strong>Year Level</strong> when a block name appears under more than one program or year level. Program may use its code or name; Year Level may use its name or whole number. Each row must identify one target block in this setup.</p>
+<p class="small text-secondary">CSV header: <code>student_id,name,email,block,program,year_level</code>. UTF-8 comma-separated CSV, maximum 1 MB / 500 rows. Existing matching accounts are reused.</p>
+<p><a href="/admin/setup/template?scoped=1" class="btn btn-sm btn-outline-secondary">Download CSV Template</a></p>
 <div class="row g-2 align-items-end"><div class="col-md-8"><label class="form-label" for="csv_file">Student CSV</label><input class="form-control" type="file" name="csv_file" id="csv_file" accept=".csv,text/csv"></div><div class="col-md-4"><button class="btn btn-outline-primary" name="action" value="preview">Preview CSV</button></div></div>
 @if(!empty($draft['csv_preview']))
     <div class="d-flex flex-wrap align-items-center gap-2 mt-4 mb-2"><strong>{{ $csv['valid_count'] }} valid · {{ $csv['invalid_count'] }} invalid rows</strong><button class="btn btn-sm btn-outline-danger" name="action" value="clear_csv">Remove CSV</button></div>
     @if(isset($csv['errors'][0]))
         <div class="alert alert-danger">@foreach($csv['errors'][0] as $error)<div>{{ $error }}</div>@endforeach</div>
     @endif
-    <div class="table-responsive"><table class="table"><thead><tr><th>Row</th><th>Student</th><th>Email</th><th>Block</th><th>Preview Result</th></tr></thead><tbody>
+    <div class="table-responsive"><table class="table"><thead><tr><th>Row</th><th>Student</th><th>Email</th><th>Target Program / Year Level / Block</th><th>Preview Result</th></tr></thead><tbody>
         @foreach($csvRows as $row)
-            <tr><td>{{ $row['row'] }}</td><td>{{ $row['name'] }}<div class="small">{{ $row['student_number'] }}</div></td><td>{{ $row['email'] }}</td><td>{{ $row['block'] }}</td><td>@if($row['valid'])<span class="badge text-bg-success">{{ $row['action'] === 'existing' ? 'Reuse existing account' : 'Invite new student' }}</span>@else<ul class="text-danger mb-0">@foreach($row['errors'] as $error)<li>{{ $error }}</li>@endforeach</ul>@endif</td></tr>
+            <tr><td>{{ $row['row'] }}</td><td>{{ $row['name'] }}<div class="small">{{ $row['student_number'] }}</div></td><td>{{ $row['email'] }}</td><td>{{ filled($row['block_label'] ?? '') ? $row['block_label'] : $row['block'] }}@if(!filled($row['block_label'] ?? '') && (filled($row['program'] ?? '') || filled($row['year_level'] ?? '')))<div class="small text-secondary">{{ $row['program'] ?? '' }} / {{ $row['year_level'] ?? '' }}</div>@endif</td><td>@if($row['valid'])<span class="badge text-bg-success">{{ $row['action'] === 'existing' ? 'Reuse existing account' : 'Invite new student' }}</span>@else<ul class="text-danger mb-0">@foreach($row['errors'] as $error)<li>{{ $error }}</li>@endforeach</ul>@endif</td></tr>
         @endforeach
     </tbody></table></div>
     {{ $csvRows->links() }}
