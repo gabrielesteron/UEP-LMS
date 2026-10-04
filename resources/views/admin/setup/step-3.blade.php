@@ -1,4 +1,4 @@
-<p class="text-secondary">Select a subject from the recent catalog or enter its code. An existing code reuses that subject without changing its details. Add up to 50 subjects.</p>
+<p class="text-secondary">Select a curriculum subject for the chosen Program, Year Level and Semester, or a shared catalog subject. For a code used by multiple programs, select the exact curriculum entry. Existing subjects keep their details. Add up to 50 subjects.</p>
 <div data-repeat="subjects">
     @foreach(old('subjects', $draft['subjects'] ?? [['id'=>null,'code'=>'','name'=>'','units'=>3]]) as $index => $subject)
         @include('admin.setup.subject-row', ['rowIndex'=>$index])

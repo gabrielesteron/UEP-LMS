@@ -29,7 +29,7 @@ class Catalog
             'blocks' => [Block::class, ['academic_year_id' => 'academic-years', 'program_id' => 'programs', 'year_level_id' => 'year-levels', 'name' => 'text', 'semester' => 'select:1,2,3']],
             'students' => [Student::class, ['user_id' => 'student-users', 'student_number' => 'text', 'block_id' => 'blocks']],
             'teachers' => [Teacher::class, ['user_id' => 'teacher-users', 'employee_number' => 'text']],
-            'subjects' => [Subject::class, ['code' => 'text', 'name' => 'text', 'description' => 'textarea', 'units' => 'number', 'status' => 'select:active,inactive']],
+            'subjects' => [Subject::class, ['code' => 'text', 'name' => 'text', 'description' => 'textarea', 'units' => 'number', 'status' => 'select:active,inactive', 'program_id' => 'programs', 'year_level_id' => 'year-levels', 'semester' => 'select:1,2,3', 'lecture_units' => 'number', 'laboratory_units' => 'number']],
             'teacher-assignments' => [TeacherAssignment::class, ['teacher_id' => 'teachers', 'block_id' => 'blocks', 'subject_id' => 'subjects']],
             'enrollments' => [Enrollment::class, ['student_id' => 'students', 'teacher_assignment_id' => 'teacher-assignments']],
             'schedules' => [ClassSchedule::class, ['teacher_assignment_id' => 'teacher-assignments', 'day' => 'select:1,2,3,4,5,6,7', 'start_time' => 'time', 'end_time' => 'time', 'room' => 'text']],
@@ -45,6 +45,9 @@ class Catalog
 
     public static function label($row): string
     {
+        if ($row instanceof Subject) {
+            return $row->catalog_label;
+        }
         if ($row instanceof TeacherAssignment) {
             return $row->label.' · '.$row->block->academicYear->name.' / S'.$row->block->semester;
         }
@@ -76,6 +79,7 @@ class Catalog
                 'teacher-assignments' => ['block.program', 'block.academicYear', 'subject'],
                 'blocks' => ['program', 'academicYear'],
                 'students', 'teachers' => ['user'],
+                'subjects' => ['program', 'yearLevel'],
                 default => [],
             };
 
@@ -98,7 +102,7 @@ class Catalog
         };
     }
 
-    public static function rules(string $resource, ?int $id): array
+    public static function rules(string $resource, ?int $id, array $input = []): array
     {
         [$model,$fields] = self::definition($resource);
         $table = (new $model)->getTable();
@@ -122,7 +126,13 @@ class Catalog
         }
         foreach (['email', 'code', 'student_number', 'employee_number', 'user_id'] as $unique) {
             if (isset($fields[$unique])) {
-                $rules[$unique][] = Rule::unique($table, $unique)->ignore($id);
+                $uniqueRule = Rule::unique($table, $unique)->ignore($id);
+                if ($resource === 'subjects' && $unique === 'code') {
+                    foreach (['program_id', 'year_level_id', 'semester'] as $scope) {
+                        $uniqueRule->where($scope, $input[$scope] ?? null);
+                    }
+                }
+                $rules[$unique][] = $uniqueRule;
             }
         }
         if (in_array($resource, ['academic-years', 'year-levels'])) {
@@ -130,6 +140,17 @@ class Catalog
         }
         if ($resource === 'year-levels') {
             $rules['level'][] = Rule::unique($table, 'level')->ignore($id);
+        }
+        if ($resource === 'subjects') {
+            $rules['units'] = ['required', 'numeric', 'decimal:0,2', 'gt:0', 'max:12'];
+            foreach (['program_id', 'year_level_id', 'semester'] as $scope) {
+                $rules[$scope][0] = 'nullable';
+                $other = implode(',', array_diff(['program_id', 'year_level_id', 'semester'], [$scope]));
+                $rules[$scope][] = 'required_with:'.$other;
+            }
+            foreach (['lecture_units', 'laboratory_units'] as $units) {
+                $rules[$units] = ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:12', 'required_with:'.($units === 'lecture_units' ? 'laboratory_units' : 'lecture_units')];
+            }
         }
         if ($resource === 'academic-years') {
             $rules['ends_on'][] = 'after:starts_on';

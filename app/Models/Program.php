@@ -18,4 +18,9 @@ class Program extends Model
     {
         return $this->hasMany(Block::class);
     }
+
+    public function subjects()
+    {
+        return $this->hasMany(Subject::class);
+    }
 }

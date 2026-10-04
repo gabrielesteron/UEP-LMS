@@ -36,7 +36,7 @@ class AcademicSetup
                 'semester' => 'required|integer|in:1,2,3', 'program_id' => 'nullable|integer|exists:programs,id', 'year_level_id' => 'nullable|integer|exists:year_levels,id',
             ],
             2 => ['blocks' => 'required|array|min:1|max:30', 'blocks.*.name' => 'bail|required|string|max:120|distinct:ignore_case'],
-            3 => ['subjects' => 'required|array|min:1|max:50', 'subjects.*.id' => 'nullable|integer', 'subjects.*.code' => 'bail|required|string|max:120|distinct:ignore_case', 'subjects.*.name' => 'required|string|max:120', 'subjects.*.units' => 'required|integer|min:1|max:12'],
+            3 => ['subjects' => 'required|array|min:1|max:50', 'subjects.*.id' => 'nullable|integer', 'subjects.*.code' => 'bail|required|string|max:120', 'subjects.*.name' => 'required|string|max:120', 'subjects.*.units' => 'required|numeric|decimal:0,2|gt:0|max:12'],
             4 => ['assignments' => 'required|array|min:1|max:100', 'assignments.*.subject' => 'required|integer|min:0', 'assignments.*.teacher_id' => 'required|integer', 'assignments.*.blocks' => 'required|array|min:1|max:30', 'assignments.*.blocks.*' => 'required|integer|min:0'],
             default => [],
         };
@@ -65,19 +65,23 @@ class AcademicSetup
         if ($step === 3) {
             $ids = array_filter(array_column($data['subjects'], 'id'));
             $codes = array_map(fn ($row) => Str::lower($row['code']), $data['subjects']);
-            $existing = Subject::whereIn('id', $ids)->orWhereIn(DB::raw('LOWER(code)'), $codes)->get();
+            $existing = Subject::with(['program', 'yearLevel'])->whereIn('id', $ids)->orWhereIn(DB::raw('LOWER(code)'), $codes)->get();
             foreach ($data['subjects'] as &$row) {
-                $subject = $row['id'] ? $existing->firstWhere('id', $row['id']) : $existing->first(fn ($item) => Str::lower($item->code) === Str::lower($row['code']));
+                $matches = $existing->filter(fn ($item) => Str::lower($item->code) === Str::lower($row['code']));
+                if (! $row['id'] && $matches->count() > 1) {
+                    throw ValidationException::withMessages(['subjects' => 'This course code belongs to multiple curricula. Select the exact Program / Year Level / Semester from Existing Subject.']);
+                }
+                $subject = $row['id'] ? $existing->firstWhere('id', $row['id']) : $matches->first();
                 if ($row['id'] && ! $subject) {
                     throw ValidationException::withMessages(['subjects' => 'A selected subject is no longer available. Select it again.']);
                 }
                 if ($subject) {
                     // Reuse the existing subject; setup never rewrites shared subject details.
-                    $row = ['id' => $subject->id, 'code' => $subject->code, 'name' => $subject->name, 'units' => $subject->units];
+                    $row = ['id' => $subject->id, 'code' => $subject->code, 'name' => $subject->name, 'units' => $subject->units, 'label' => $subject->catalog_label];
                 }
             }
             unset($row);
-            if (count(array_unique(array_map(fn ($row) => Str::lower($row['code']), $data['subjects']))) !== count($data['subjects'])) {
+            if (count(array_unique(array_map(fn ($row) => $row['id'] ? 'id:'.$row['id'] : 'code:'.Str::lower($row['code']), $data['subjects']))) !== count($data['subjects'])) {
                 throw ValidationException::withMessages(['subjects' => 'Select each subject only once. Existing subject codes are reused automatically.']);
             }
         }
@@ -244,6 +248,7 @@ class AcademicSetup
         }
         $pairs = [];
         $teachers = Teacher::whereIn('id', array_column($data['assignments'], 'teacher_id'))->with('user')->get()->keyBy('id');
+        $curriculum = Subject::with('yearLevel')->whereIn('id', array_filter(array_column($data['subjects'], 'id')))->get()->keyBy('id');
         foreach ($data['assignments'] as $index => $row) {
             $teacherUser = $teachers->get($row['teacher_id'])?->user;
             if (! isset($data['subjects'][$row['subject']]) || ! $teacherUser || $teacherUser->role !== 'teacher') {
@@ -252,6 +257,11 @@ class AcademicSetup
             foreach ($row['blocks'] as $blockIndex) {
                 if (! isset($data['blocks'][$blockIndex])) {
                     throw ValidationException::withMessages(["assignments.$index.blocks" => 'Select only blocks included in this setup.']);
+                }
+                $subject = $curriculum->get($data['subjects'][$row['subject']]['id']);
+                $block = $data['blocks'][$blockIndex];
+                if ($subject?->program_id && ($subject->program_id != $block['program_id'] || $subject->semester != $data['semester'] || ($block['year_level_id'] ? $subject->year_level_id != $block['year_level_id'] : $subject->yearLevel->level != $block['new_level']))) {
+                    throw ValidationException::withMessages(["assignments.$index.blocks" => 'The curriculum subject must match the block Program, Year Level and Semester.']);
                 }
                 $key = $blockIndex.':'.$row['subject'];
                 if (isset($pairs[$key])) {
@@ -305,7 +315,7 @@ class AcademicSetup
     public static function duplicate(array $scope, bool $copyStudents, bool $copySchedules): array
     {
         $scope = Validator::make($scope, ['academic_year_id' => 'required|integer|exists:academic_years,id', 'program_id' => 'required|integer|exists:programs,id', 'year_level_id' => 'required|integer|exists:year_levels,id', 'semester' => 'required|integer|in:1,2,3'])->validate();
-        $blocks = Block::where($scope)->with(['classes.subject', 'classes.teacher.user'])->orderBy('id')->limit(31)->get();
+        $blocks = Block::where($scope)->with(['classes.subject.program', 'classes.subject.yearLevel', 'classes.teacher.user'])->orderBy('id')->limit(31)->get();
         if ($blocks->isEmpty() || $blocks->count() > 30) {
             throw ValidationException::withMessages(['source' => 'Choose a previous setup with 1–30 blocks.']);
         }
@@ -340,7 +350,7 @@ class AcademicSetup
                 'blocks' => $blocks->map(fn ($block) => ['name' => $block->name])->all()]]]],
             'blocks' => $blocks->map(fn ($block) => ['name' => $block->name, 'program_id' => $block->program_id, 'year_level_id' => $block->year_level_id,
                 'new_name' => null, 'new_level' => null, 'group' => 0, 'year_level_group' => 0])->all(),
-            'subjects' => $subjects->map(fn ($subject) => ['id' => $subject->id, 'code' => $subject->code, 'name' => $subject->name, 'units' => $subject->units])->all(),
+            'subjects' => $subjects->map(fn ($subject) => ['id' => $subject->id, 'code' => $subject->code, 'name' => $subject->name, 'units' => $subject->units, 'label' => $subject->catalog_label])->all(),
             'assignments' => array_values($assignments), 'students' => $students,
             'source' => $scope, 'source_block_ids' => $blocks->pluck('id')->all(), 'copy_schedules' => $copySchedules,
         ];
@@ -373,8 +383,10 @@ class AcademicSetup
             if ($newSubjects) {
                 Subject::insert(array_map(fn ($row) => ['code' => $row['code'], 'name' => $row['name'], 'units' => $row['units'], 'status' => 'active', 'created_at' => $now, 'updated_at' => $now], array_values($newSubjects)));
             }
-            $subjectMap = Subject::whereIn('code', array_column($data['subjects'], 'code'))->get()->keyBy('code');
-            $subjects = array_map(fn ($row) => $subjectMap->get($row['code']), $data['subjects']);
+            $catalog = Subject::whereIn('id', array_filter(array_column($data['subjects'], 'id')))->orWhere(function ($query) use ($newSubjects) {
+                $query->whereNull('program_id')->whereIn('code', array_column($newSubjects, 'code'));
+            })->get();
+            $subjects = array_map(fn ($row) => $row['id'] ? $catalog->firstWhere('id', $row['id']) : $catalog->first(fn ($subject) => ! $subject->program_id && $subject->code === $row['code']), $data['subjects']);
             $classRows = [];
             foreach ($data['assignments'] as $row) {
                 foreach ($row['blocks'] as $blockIndex) {

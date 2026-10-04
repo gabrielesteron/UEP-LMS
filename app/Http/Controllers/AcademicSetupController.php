@@ -49,7 +49,14 @@ class AcademicSetupController extends Controller
             $data += ['academicYears' => AcademicYear::orderByDesc('starts_on')->limit(200)->get(), 'programs' => Program::orderBy('name')->limit(200)->get(), 'yearLevels' => YearLevel::orderBy('level')->limit(200)->get()];
         }
         if ($step === 3) {
-            $data['subjectChoices'] = Subject::orderBy('code')->limit(200)->get(['id', 'code', 'name', 'units']);
+            $data['subjectChoices'] = Subject::with(['program', 'yearLevel'])->where(function ($query) use ($draft) {
+                $query->whereNull('program_id');
+                foreach ($draft['blocks'] ?? [] as $block) {
+                    $query->orWhere(function ($scope) use ($draft, $block) {
+                        $scope->where('program_id', $block['program_id'])->where('year_level_id', $block['year_level_id'])->where('semester', $draft['semester']);
+                    });
+                }
+            })->orderBy('code')->get();
         }
         if ($step === 4 || $step === 6) {
             $data['teachers'] = Teacher::with('user')->whereHas('user', fn ($q) => $q->where('role', 'teacher'))->orderBy('id')->limit(1000)->get();

@@ -25,7 +25,7 @@
 <div class="table-responsive"><table class="table"><thead><tr><th>Subject</th><th>Units</th><th>Teacher</th><th>Blocks</th></tr></thead><tbody>
     @foreach($draft['assignments'] as $row)
         @php($subject = $draft['subjects'][$row['subject']])
-        <tr><td>{{ $subject['code'] }} — {{ $subject['name'] }}<div class="small text-secondary">{{ $subject['id'] ? 'Existing subject reused' : 'New subject' }}</div></td><td>{{ $subject['units'] }}</td><td>{{ $teacherNames->get($row['teacher_id'])?->user?->name }}</td><td>@foreach($row['blocks'] as $blockIndex)<div>{{ $blockLabels->get($blockIndex)['label'] ?? $draft['blocks'][$blockIndex]['name'] }}</div>@endforeach</td></tr>
+        <tr><td>{{ $subject['label'] ?? ($subject['code'].' — '.$subject['name']) }}<div class="small text-secondary">{{ $subject['id'] ? 'Existing subject reused' : 'New subject' }}</div></td><td>{{ $subject['units'] }}</td><td>{{ $teacherNames->get($row['teacher_id'])?->user?->name }}</td><td>@foreach($row['blocks'] as $blockIndex)<div>{{ $blockLabels->get($blockIndex)['label'] ?? $draft['blocks'][$blockIndex]['name'] }}</div>@endforeach</td></tr>
     @endforeach
 </tbody></table></div>
 @if(count($assignedBlocks) < count($draft['blocks']))

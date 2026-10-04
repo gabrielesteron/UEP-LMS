@@ -14,7 +14,17 @@ class CatalogRequest extends FormRequest
 
     public function rules(): array
     {
-        return Catalog::rules($this->route('resource'), $this->route('id') ? (int) $this->route('id') : null);
+        return Catalog::rules($this->route('resource'), $this->route('id') ? (int) $this->route('id') : null, $this->all());
+    }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            if ($this->route('resource') === 'subjects' && ! $validator->errors()->any()
+                && $this->filled('lecture_units') && abs((float) $this->units - (float) $this->lecture_units - (float) $this->laboratory_units) > 0.0001) {
+                $validator->errors()->add('units', 'Total units must equal lecture units plus laboratory units.');
+            }
+        });
     }
 
     public function attributes(): array

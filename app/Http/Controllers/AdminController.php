@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\CatalogRequest;
 use App\Models\AcademicYear;
+use App\Models\Block;
 use App\Models\Enrollment;
 use App\Models\Setting;
 use App\Models\Student;
+use App\Models\Subject;
 use App\Models\TeacherAssignment;
 use App\Models\User;
 use App\Notifications\Invitation;
@@ -25,6 +27,9 @@ class AdminController extends Controller
     {
         [$model,$fields] = Catalog::definition($resource);
         $q = $model::query();
+        if ($resource === 'subjects') {
+            $q->with(['program', 'yearLevel', 'prerequisites']);
+        }
         if ($r->filled('q')) {
             $q->where(function ($q) use ($fields, $r) {
                 foreach ($fields as $field => $type) {
@@ -54,7 +59,10 @@ class AdminController extends Controller
         }
 
         $fieldChoices = collect($fields)->map(fn ($type) => Catalog::choices($type))->all();
-        $missingRelated = collect($fields)->contains(fn ($type, $field) => ! in_array($type, ['text', 'email', 'date', 'time', 'textarea', 'number']) && empty($fieldChoices[$field]));
+        $missingRelated = collect($fields)->contains(fn ($type, $field) => ! ($resource === 'subjects' && in_array($field, ['program_id', 'year_level_id', 'semester'])) && ! in_array($type, ['text', 'email', 'date', 'time', 'textarea', 'number']) && empty($fieldChoices[$field]));
+        if ($resource === 'subjects') {
+            $row->load(['prerequisites.program', 'prerequisites.yearLevel']);
+        }
 
         return view('admin.form', compact('resource', 'fields', 'row', 'fieldChoices', 'missingRelated'));
     }
@@ -64,6 +72,15 @@ class AdminController extends Controller
         [$model] = Catalog::definition($resource);
         $row = $id ? $model::findOrFail($id) : new $model;
         $data = $r->validated();
+        if ($resource === 'subjects' && $id && $row->program_id) {
+            // Curriculum placement is maintained by the validated importer. Editing
+            // titles and credit values must not move courses or prerequisite IDs.
+            foreach (['program_id', 'year_level_id', 'semester', 'code'] as $scope) {
+                if ((string) ($data[$scope] ?? '') !== (string) $row->$scope) {
+                    throw ValidationException::withMessages([$scope => 'Use the curriculum importer to change an imported course code or placement.']);
+                }
+            }
+        }
         if ($row instanceof User) {
             abort_if($row->role === 'admin', 403);
             if ($id && ($row->student || $row->teacher) && $row->role !== $data['role']) {
@@ -90,6 +107,13 @@ class AdminController extends Controller
         if ($resource === 'enrollments') {
             if (Student::findOrFail($data['student_id'])->block_id !== TeacherAssignment::findOrFail($data['teacher_assignment_id'])->block_id) {
                 throw ValidationException::withMessages(['student_id' => 'The student must belong to this class block.']);
+            }
+        }
+        if ($resource === 'teacher-assignments') {
+            $subject = Subject::findOrFail($data['subject_id']);
+            $block = Block::findOrFail($data['block_id']);
+            if ($subject->program_id && ($subject->program_id != $block->program_id || $subject->year_level_id != $block->year_level_id || $subject->semester != $block->semester)) {
+                throw ValidationException::withMessages(['subject_id' => 'Choose a curriculum subject matching the block Program, Year Level and Semester.']);
             }
         }
         try {

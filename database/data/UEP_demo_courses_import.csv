@@ -1,0 +1,222 @@
+program_code,year_level,semester,course_code,course_title,units,lecture_units,laboratory_units,prerequisite
+BSA,1 Year,1st,BSA 1101,Fundamentals of Accounting 1 & 2,6.0,6,0,
+BSA,1 Year,1st,BSA 1102,Law on Obligation and Contracts,3.0,3,0,
+BSA,1 Year,1st,ZGE 1108,Understanding the Self,3.0,3,0,
+BSA,1 Year,2nd,BSA 1201,Financial Accounting and Reporting,3.0,3,0,BSA 1101
+BSA,1 Year,2nd,BSA 1202,Income Taxation,3.0,3,0,BSA 1101
+BSA,1 Year,2nd,ZGE 1105,Purposive Communication,3.0,3,0,
+BSA,2 Year,1st,BSA 2101,Conceptual Framework and Accounting Standards,3.0,3,0,BSA 1201
+BSA,2 Year,1st,BSA 2102,Intermediate Accounting 1 & 2,6.0,6,0,BSA 1201
+BSA,2 Year,1st,BSA 2103,Cost Accounting and Control,3.0,3,0,BSA 1101
+BSA,2 Year,2nd,BSA 2201,Intermediate Accounting 3,3.0,3,0,BSA 2102
+BSA,2 Year,2nd,BSA 2202,Strategic Cost Management,3.0,3,0,BSA 2103
+BSA,2 Year,2nd,BSA 2205,Operations Management and TQM,3.0,3,0,
+BSA,3 Year,1st,BSA 3101,Accounting for Special Transactions,3.0,3,0,BSA 2201
+BSA,3 Year,1st,BSA 3102,Managerial Accounting,6.0,6,0,BSA 2103
+BSA,3 Year,1st,BSA 3105,Auditing and Assurance Principles,3.0,3,0,BSA 2101
+BSA,3 Year,2nd,BSA 3201,Auditing and Assurance: Concepts and Applications 1 & 2,6.0,6,0,BSA 3105
+BSA,3 Year,2nd,BSA 3203,Accounting for Business Combination,3.0,3,0,BSA 2201
+BSA,3 Year,2nd,BSA 3205,Financial Management,3.0,3,0,
+BSA,4 Year,1st,BSA 4970,Accounting Internship,6.0,0,6,
+BSA,4 Year,1st,BSA 4990,Accounting Research,3.0,3,0,
+BSA,4 Year,2nd,BSA 4201,Accounting Integration - FAR,2.0,2,0,BSA 3201
+BSA,4 Year,2nd,BSA 4207,Auditing in CIS Environment,3.0,3,0,BSA 3201
+BSA,4 Year,2nd,BSA 4208,Financial Markets,3.0,3,0,BSA 3205
+BSAT,1 Year,1st,ACTG 101,Fundamentals of Accounting,3.0,3,0,
+BSAT,1 Year,1st,BACC 1,Basic Microeconomics,3.0,3,0,
+BSAT,1 Year,1st,GE 1,Understanding the Self,3.0,3,0,
+BSAT,1 Year,2nd,ACTG 102,Financial Accounting,3.0,3,0,ACTG 101
+BSAT,1 Year,2nd,AIS 101,Computer Applications in Accounting,3.0,2,1,
+BSAT,1 Year,2nd,BLAW 101,Law on Obligations and Contracts,3.0,3,0,
+BSAT,2 Year,1st,ACTG 201,Intermediate Accounting,3.0,3,0,ACTG 102
+BSAT,2 Year,1st,ACTG 202,Cost Accounting,3.0,3,0,ACTG 101
+BSAT,2 Year,1st,STAT 201,Business Statistics,3.0,3,0,
+BSAT,2 Year,2nd,ACTG 203,Taxation,3.0,3,0,ACTG 102
+BSAT,2 Year,2nd,AIS 201,Accounting Information Systems,3.0,2,1,AIS 101
+BSAT,2 Year,2nd,FIN 201,Financial Management,3.0,3,0,ACTG 102
+BSAT,3 Year,1st,ACTG 301,Advanced Accounting,3.0,3,0,ACTG 201
+BSAT,3 Year,1st,AUD 301,Auditing Fundamentals,3.0,3,0,ACTG 201
+BSAT,3 Year,1st,MGT 301,Management Accounting,3.0,3,0,ACTG 202
+BSAT,3 Year,2nd,AIS 302,Accounting Software Applications,3.0,2,1,AIS 201
+BSAT,3 Year,2nd,IC 301,Internal Control,3.0,3,0,AUD 301
+BSAT,3 Year,2nd,RES 301,Business Research,3.0,3,0,STAT 201
+BSAT,4 Year,1st,ACTG 401,Accounting Practicum,3.0,2,1,AIS 302
+BSAT,4 Year,1st,ACTG 402,Financial Reporting,3.0,3,0,ACTG 301
+BSAT,4 Year,1st,RES 401,Accounting Research,3.0,3,0,RES 301
+BSAT,4 Year,2nd,ACTG 403,Professional Accounting Practice,3.0,3,0,RES 401
+BSAT,4 Year,2nd,ACTG ELEC 1,Accounting Elective,3.0,3,0,
+BSAT,4 Year,2nd,OJT 401,Accounting Internship,6.0,0,6,ACTG 401
+BSBA,1 Year,1st,ACTG 1,Financial Accounting and Reporting,3.0,3,0,
+BSBA,1 Year,1st,BACC 1,Basic Microeconomics,3.0,3,0,
+BSBA,1 Year,1st,GE 1,Understanding the Self,3.0,3,0,
+BSBA,1 Year,2nd,BACC 2,Law on Obligations and Contracts,3.0,3,0,
+BSBA,1 Year,2nd,ENTREP 101,The Entrepreneurial Mind,3.0,3,0,
+BSBA,1 Year,2nd,GE 6,Art Appreciation,3.0,3,0,
+BSBA,2 Year,1st,BF 201,Business Finance,3.0,3,0,ACTG 1
+BSBA,2 Year,1st,MKT 201,Marketing Management,3.0,3,0,
+BSBA,2 Year,1st,STAT 201,Business Statistics,3.0,3,0,
+BSBA,2 Year,2nd,HRM 202,Human Resource Management,3.0,3,0,
+BSBA,2 Year,2nd,MGT 202,Operations Management,3.0,3,0,
+BSBA,2 Year,2nd,RES 201,Business Research,3.0,3,0,STAT 201
+BSBA,3 Year,1st,BLAW 301,Business Law,3.0,3,0,BACC 2
+BSBA,3 Year,1st,FM 301,Financial Management,3.0,3,0,BF 201
+BSBA,3 Year,1st,MKT 301,Marketing Management,3.0,3,0,MKT 201
+BSBA,3 Year,2nd,ENTREP 301,Entrepreneurship,3.0,3,0,ENTREP 101
+BSBA,3 Year,2nd,RES 302,Business Research 2,3.0,3,0,RES 201
+BSBA,3 Year,2nd,STRAT 301,Strategic Management,3.0,3,0,MGT 202
+BSBA,4 Year,1st,MGT 402,Strategic Business Analysis,3.0,3,0,STRAT 301
+BSBA,4 Year,1st,PRACT 401,Business Practicum,3.0,2,1,RES 302
+BSBA,4 Year,1st,SEM 401,Management Seminar,3.0,3,0,STRAT 301
+BSBA,4 Year,2nd,BUS 402,Business Policy,3.0,3,0,STRAT 301
+BSBA,4 Year,2nd,BUS ELEC 1,Business Elective,3.0,3,0,
+BSBA,4 Year,2nd,OJT 401,Internship / OJT,6.0,6,0,PRACT 401
+BSCE,1 Year,1st,CE 101,Engineering Drawing,3.0,2,1,
+BSCE,1 Year,1st,CHEM 101,Engineering Chemistry,3.0,2,1,
+BSCE,1 Year,1st,MATH 101,Calculus 1,5.0,5,0,
+BSCE,1 Year,2nd,CE 102,Engineering Mechanics,3.0,3,0,
+BSCE,1 Year,2nd,MATH 102,Calculus 2,5.0,5,0,MATH 101
+BSCE,1 Year,2nd,PHYS 101,Physics for Engineers,4.0,3,1,MATH 101
+BSCE,2 Year,1st,CE 201,Surveying,4.0,2,2,CE 101
+BSCE,2 Year,1st,CE 202,Mechanics of Materials,3.0,3,0,CE 102
+BSCE,2 Year,1st,MATH 201,Differential Equations,3.0,3,0,MATH 102
+BSCE,2 Year,2nd,CE 203,Fluid Mechanics,4.0,3,1,CE 202
+BSCE,2 Year,2nd,CE 204,Engineering Geology,3.0,3,0,
+BSCE,2 Year,2nd,CE 205,Numerical Methods,3.0,3,0,MATH 201
+BSCE,3 Year,1st,CE 301,Structural Theory,3.0,3,0,CE 202
+BSCE,3 Year,1st,CE 302,Reinforced Concrete Design,4.0,3,1,CE 301
+BSCE,3 Year,1st,CE 303,Hydraulics,4.0,3,1,CE 203
+BSCE,3 Year,2nd,CE 304,Structural Analysis,3.0,3,0,CE 301
+BSCE,3 Year,2nd,CE 305,Highway Engineering,3.0,3,0,CE 201
+BSCE,3 Year,2nd,CE 323,Principles of Steel Design,3.0,3,0,CE 301
+BSCE,4 Year,1st,CE 401,Foundation Engineering,3.0,3,0,CE 302
+BSCE,4 Year,1st,CE 402,Construction Methods,3.0,3,0,
+BSCE,4 Year,1st,CE 403,Water Resources Engineering,3.0,3,0,CE 303
+BSCE,4 Year,2nd,CE 404,Construction Management,3.0,3,0,CE 402
+BSCE,4 Year,2nd,CE 405,Civil Engineering Design,3.0,3,0,CE 401
+BSCE,4 Year,2nd,CE 406,Internship / OJT,6.0,0,6,
+BSCrim,1 Year,1st,CJ 101,Criminal Justice System,3.0,3,0,
+BSCrim,1 Year,1st,CRIM 101,Introduction to Criminology,3.0,3,0,
+BSCrim,1 Year,1st,GE 1,Understanding the Self,3.0,3,0,
+BSCrim,1 Year,2nd,CLJ 101,Criminal Law 1,3.0,3,0,
+BSCrim,1 Year,2nd,CRIM 103,Introduction to Criminalistics,3.0,2,1,CRIM 101
+BSCrim,1 Year,2nd,LEA 101,Law Enforcement Administration,3.0,3,0,
+BSCrim,2 Year,1st,CLJ 102,Criminal Law 2,3.0,3,0,CLJ 101
+BSCrim,2 Year,1st,CRIM 201,Crime Detection and Investigation,3.0,3,0,CRIM 103
+BSCrim,2 Year,1st,FOR 201,Forensic Science,3.0,2,1,CRIM 103
+BSCrim,2 Year,2nd,CLJ 201,Criminal Procedure,3.0,3,0,CLJ 102
+BSCrim,2 Year,2nd,FOR 202,Forensic Photography,3.0,2,1,FOR 201
+BSCrim,2 Year,2nd,LEA 202,Police Operations,3.0,3,0,LEA 101
+BSCrim,3 Year,1st,CLJ 302,Criminal Law Book 2,3.0,3,0,CLJ 201
+BSCrim,3 Year,1st,CRIM 301,Juvenile Delinquency and Juvenile Justice System,3.0,3,0,
+BSCrim,3 Year,1st,FOR 301,Forensic Ballistics,3.0,2,1,FOR 201
+BSCrim,3 Year,2nd,COR 301,Corrections Administration,3.0,3,0,
+BSCrim,3 Year,2nd,CRIM 302,Non-Institutional Corrections,3.0,3,0,COR 301
+BSCrim,3 Year,2nd,RES 301,Criminological Research,3.0,3,0,
+BSCrim,4 Year,1st,CRIM 401,Criminology Internship,6.0,0,6,
+BSCrim,4 Year,1st,CRIM 402,Criminology Research,3.0,3,0,RES 301
+BSCrim,4 Year,1st,LEA 401,Advanced Law Enforcement Administration,3.0,3,0,LEA 202
+BSCrim,4 Year,2nd,CRIM 403,Criminology Practicum,6.0,0,6,CRIM 401
+BSCrim,4 Year,2nd,CRIM ELEC 1,Criminology Elective,3.0,3,0,
+BSCrim,4 Year,2nd,SEM 402,Criminology Seminar,3.0,3,0,
+BSEd,1 Year,1st,GE 1,Understanding the Self,3.0,3,0,
+BSEd,1 Year,1st,GE 5,Purposive Communication,3.0,3,0,
+BSEd,1 Year,1st,PROF 101,Foundations of Education,3.0,3,0,
+BSEd,1 Year,2nd,GE 2,Readings in Philippine History,3.0,3,0,
+BSEd,1 Year,2nd,PROF 102,Educational Psychology,3.0,3,0,PROF 101
+BSEd,1 Year,2nd,PROF 103,The Teacher and the Community,3.0,3,0,PROF 101
+BSEd,2 Year,1st,INSTI 201,Technology for Teaching and Learning,3.0,2,1,
+BSEd,2 Year,1st,MAJOR 201,Major Course 1,3.0,3,0,
+BSEd,2 Year,1st,PROF 201,Assessment of Learning,3.0,3,0,PROF 102
+BSEd,2 Year,2nd,MAJOR 202,Major Course 2,3.0,3,0,MAJOR 201
+BSEd,2 Year,2nd,PROF 202,Curriculum Development,3.0,3,0,PROF 201
+BSEd,2 Year,2nd,PROF 203,Teaching Strategies,3.0,3,0,PROF 102
+BSEd,3 Year,1st,FS 301,Field Study 1,3.0,2,1,
+BSEd,3 Year,1st,MAJOR 301,Major Course 3,3.0,3,0,MAJOR 202
+BSEd,3 Year,1st,PROF 301,Classroom Management,3.0,3,0,PROF 203
+BSEd,3 Year,2nd,FS 302,Field Study 2,3.0,2,1,FS 301
+BSEd,3 Year,2nd,MAJOR 302,Major Course 4,3.0,3,0,MAJOR 301
+BSEd,3 Year,2nd,PROF 302,Special Topics in Education,3.0,3,0,
+BSEd,4 Year,1st,PRAC 401,Practice Teaching,6.0,0,6,FS 302
+BSEd,4 Year,1st,PROF 401,Professional Education Seminar,3.0,3,0,
+BSEd,4 Year,1st,RES 401,Educational Research,3.0,3,0,
+BSEd,4 Year,2nd,MAJOR 401,Major Course 5,3.0,3,0,MAJOR 302
+BSEd,4 Year,2nd,PRAC 402,Internship,6.0,0,6,PRAC 401
+BSEd,4 Year,2nd,SEM 402,Education Seminar,3.0,3,0,RES 401
+BSHRM,1 Year,1st,GE 1,Understanding the Self,3.0,3,0,
+BSHRM,1 Year,1st,HM 101,Fundamentals of Hospitality Management,3.0,3,0,
+BSHRM,1 Year,1st,HME 1,Housekeeping Operations,3.0,2,1,
+BSHRM,1 Year,2nd,GE 2,Readings in Philippine History,3.0,3,0,
+BSHRM,1 Year,2nd,HM 102,Basic Culinary Arts,3.0,1,2,
+BSHRM,1 Year,2nd,HME 2,Food and Beverage Service,3.0,2,1,
+BSHRM,2 Year,1st,HM 201,Hospitality Accounting,3.0,3,0,
+BSHRM,2 Year,1st,HME 3,Front Office Operations,3.0,2,1,HM 101
+BSHRM,2 Year,1st,HME 4,Baking and Pastry Production,3.0,1,2,HM 102
+BSHRM,2 Year,2nd,HM 202,Menu Planning,3.0,3,0,HM 102
+BSHRM,2 Year,2nd,HM 203,Events Management,3.0,3,0,
+BSHRM,2 Year,2nd,HME 5,Bartending,3.0,1,2,HME 2
+BSHRM,3 Year,1st,HM 301,Restaurant Management,3.0,3,0,HME 2
+BSHRM,3 Year,1st,HM 302,Tourism and Hospitality Operations,3.0,3,0,
+BSHRM,3 Year,1st,HM 303,Hospitality Marketing,3.0,3,0,
+BSHRM,3 Year,2nd,HM 304,Banquet and Catering Management,3.0,2,1,HM 203
+BSHRM,3 Year,2nd,HM 305,Facilities Management,3.0,3,0,
+BSHRM,3 Year,2nd,HM 306,Hospitality Entrepreneurship,3.0,3,0,
+BSHRM,4 Year,1st,HM 401,Hospitality Practicum,3.0,2,1,HM 301
+BSHRM,4 Year,1st,HM 402,Hospitality Research,3.0,3,0,
+BSHRM,4 Year,1st,HM 403,Hotel Operations Management,3.0,3,0,HM 301
+BSHRM,4 Year,2nd,HM 404,Hospitality Management Seminar,3.0,3,0,HM 402
+BSHRM,4 Year,2nd,HM ELEC 1,Hospitality Elective,3.0,3,0,
+BSHRM,4 Year,2nd,OJT 401,Hospitality Internship,6.0,0,6,HM 401
+BSIT,1 Year,1st,CC 101,Introduction to Computing,3.0,2,1,
+BSIT,1 Year,1st,GE 1,Understanding the Self,3.0,3,0,
+BSIT,1 Year,1st,GE 5,Purposive Communication,3.0,3,0,
+BSIT,1 Year,2nd,CC 102,Computer Programming 1,3.0,2,1,CC 101
+BSIT,1 Year,2nd,GE 2,Readings in Philippine History,3.0,3,0,
+BSIT,1 Year,2nd,PF 101,Programming Fundamentals,3.0,2,1,
+BSIT,2 Year,1st,CC 103,Data Structures and Algorithms,3.0,2,1,CC 102
+BSIT,2 Year,1st,DB 101,Database Management,3.0,2,1,CC 102
+BSIT,2 Year,1st,NET 101,Networking Fundamentals,3.0,2,1,CC 101
+BSIT,2 Year,2nd,NET 102,Data Communications and Networking,3.0,2,1,NET 101
+BSIT,2 Year,2nd,SAD 101,Systems Analysis and Design,3.0,3,0,DB 101
+BSIT,2 Year,2nd,WEB 101,Web Development,3.0,2,1,CC 102
+BSIT,3 Year,1st,IT ELEC 2,IT Elective 2,3.0,3,0,
+BSIT,3 Year,1st,PF 102,Event Driven Programming,3.0,2,1,PF 101
+BSIT,3 Year,1st,SIA 101,Systems Integration and Architecture,3.0,3,0,SAD 101
+BSIT,3 Year,2nd,CC 106,Application Development,3.0,2,1,PF 102
+BSIT,3 Year,2nd,IAS 101,Information Assurance and Security,3.0,3,0,NET 102
+BSIT,3 Year,2nd,UED 101,User Experience Design,3.0,2,1,WEB 101
+BSIT,4 Year,1st,CAP 101,Capstone Project 1,3.0,3,0,SIA 101
+BSIT,4 Year,1st,IT 401,IT Professional Practice,3.0,3,0,
+BSIT,4 Year,1st,IT ELEC 3,IT Elective 3,3.0,3,0,
+BSIT,4 Year,2nd,CAP 102,Capstone Project 2,3.0,3,0,CAP 101
+BSIT,4 Year,2nd,IT ELEC 4,IT Elective 4,3.0,3,0,
+BSIT,4 Year,2nd,OJT 401,Internship / OJT,6.0,6,0,CAP 101
+BSMID,1 Year,1st,GE 1,Understanding the Self,3.0,3,0,
+BSMID,1 Year,1st,GE 7,"Science, Technology and Society",3.0,3,0,
+BSMID,1 Year,1st,IHC,Introduction to Health Care,3.0,2,1,
+BSMID,1 Year,2nd,ANA 101,Anatomy and Physiology,4.0,3,1,
+BSMID,1 Year,2nd,GE 2,Readings in Philippine History,3.0,3,0,
+BSMID,1 Year,2nd,MID 101,Fundamentals of Midwifery,3.0,2,1,IHC
+BSMID,2 Year,1st,MID 201,Normal Obstetrics,4.0,3,1,MID 101
+BSMID,2 Year,1st,MID 202,Care of the Newborn,3.0,2,1,MID 101
+BSMID,2 Year,1st,PHA 201,Pharmacology,3.0,3,0,ANA 101
+BSMID,2 Year,2nd,CHM 201,Community Midwifery,3.0,2,1,MID 202
+BSMID,2 Year,2nd,FP 201,Family Planning,3.0,3,0,MID 101
+BSMID,2 Year,2nd,MID 203,High-Risk Obstetrics,4.0,3,1,MID 201
+BSMID,3 Year,1st,MID 301,Advanced Midwifery Practice,4.0,2,2,MID 203
+BSMID,3 Year,1st,MID 302,Maternal and Child Health,3.0,3,0,MID 202
+BSMID,3 Year,1st,MID 303,Clinical Practicum 1,4.0,0,4,MID 201
+BSMID,3 Year,2nd,ETH 301,"Midwifery Ethics, Law and Practice",3.0,3,0,
+BSMID,3 Year,2nd,MID 304,Clinical Practicum 2,5.0,0,5,MID 303
+BSMID,3 Year,2nd,RES 301,Midwifery Research,3.0,3,0,
+DMID,1 Year,1st,DM 101,Foundations of Midwifery,3.0,2,1,
+DMID,1 Year,1st,DM 102,Anatomy and Physiology,4.0,3,1,
+DMID,1 Year,1st,DM 103,Basic Health Care,3.0,3,0,
+DMID,1 Year,2nd,DM 104,Normal Obstetrics,4.0,3,1,DM 101
+DMID,1 Year,2nd,DM 105,Care of the Newborn,3.0,2,1,DM 101
+DMID,1 Year,2nd,DM 106,Family Planning,3.0,3,0,DM 101
+DMID,2 Year,1st,DM 201,High-Risk Obstetrics,4.0,3,1,DM 104
+DMID,2 Year,1st,DM 202,Infant Care and Feeding,3.0,3,0,DM 105
+DMID,2 Year,1st,DM 203,Primary Health Care,3.0,3,0,DM 103
+DMID,2 Year,2nd,DM 204,"Midwifery Ethics, Law and Practice",3.0,3,0,
+DMID,2 Year,2nd,DM 205,Community Midwifery,3.0,2,1,DM 203
+DMID,2 Year,2nd,DM 206,Clinical Practicum,6.0,0,6,DM 201
