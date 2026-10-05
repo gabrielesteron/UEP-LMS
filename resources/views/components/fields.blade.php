@@ -6,7 +6,9 @@
     $invalid = $errors->has($field) ? ' is-invalid' : '';
     $decimal = in_array($field, ['total_points', 'points']) || (($resource ?? '') === 'subjects' && in_array($field, ['units', 'lecture_units', 'laboratory_units']));
     $optional = ($resource ?? '') === 'subjects' && in_array($field, ['program_id', 'year_level_id', 'semester', 'lecture_units', 'laboratory_units']);
-    $locked = ($resource ?? '') === 'subjects' && $row->program_id && in_array($field, ['code', 'program_id', 'year_level_id', 'semester']);
+    $selfAccount = ($resource ?? '') === 'users' && $row->exists && $row->id === auth()->id() && in_array($field, ['role', 'status', 'email']);
+    $value = $selfAccount ? $row->$field : $value;
+    $locked = $selfAccount || ($resource ?? '') === 'subjects' && $row->program_id && in_array($field, ['code', 'program_id', 'year_level_id', 'semester']);
 @endphp
 <div class="mb-3">
     <label class="form-label" for="field_{{ $field }}">{{ $label }} @if($field==='day')<span class="text-secondary">(1 = Monday, 7 = Sunday)</span>@endif</label>
@@ -15,7 +17,7 @@
     @elseif($choices || !in_array($type,['text','email','date','time','number','file','datetime-local']))
         <select class="form-select{{ $invalid }}" id="field_{{ $field }}" name="{{ $field }}" @required(!$optional) @disabled($locked)>
             <option value="">{{ $optional ? 'Not specified (shared catalog)' : 'Select '.$label }}</option>
-            @foreach($choices as $key=>$choice)<option value="{{ $key }}" @selected((string)$value===(string)$key)>{{ $field==='allow_text' ? ($key ? 'Yes' : 'No') : $choice }}</option>@endforeach
+            @foreach($choices as $key=>$choice)<option value="{{ $key }}" @selected((string)$value===(string)$key)>{{ $field==='role' ? (\App\Models\User::ROLES[$key] ?? $choice) : ($field==='allow_text' ? ($key ? 'Yes' : 'No') : $choice) }}</option>@endforeach
         </select>
         @if($locked)<input type="hidden" name="{{ $field }}" value="{{ $row->$field }}">@endif
         @if(!$choices)<div class="form-text">No {{ strtolower($label) }} options available. Ask an administrator to create the required records first.</div>@endif

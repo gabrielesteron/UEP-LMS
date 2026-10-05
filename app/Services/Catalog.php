@@ -22,7 +22,7 @@ class Catalog
     public static function all(): array
     {
         return [
-            'users' => [User::class, ['name' => 'text', 'email' => 'email', 'role' => 'select:student,teacher', 'status' => 'select:inactive,active,suspended']],
+            'users' => [User::class, ['name' => 'text', 'email' => 'email', 'role' => 'select:student,teacher,admin,super_admin', 'status' => 'select:inactive,active,suspended']],
             'academic-years' => [AcademicYear::class, ['name' => 'text', 'starts_on' => 'date', 'ends_on' => 'date']],
             'programs' => [Program::class, ['code' => 'text', 'name' => 'text']],
             'year-levels' => [YearLevel::class, ['name' => 'text', 'level' => 'number']],

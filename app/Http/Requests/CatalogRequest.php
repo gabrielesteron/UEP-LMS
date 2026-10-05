@@ -9,7 +9,9 @@ class CatalogRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->role === 'admin';
+        return $this->route('resource') === 'users'
+            ? (bool) $this->user()?->isSuperAdmin()
+            : (bool) $this->user()?->isAcademicAdmin();
     }
 
     public function rules(): array

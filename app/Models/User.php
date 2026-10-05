@@ -12,7 +12,10 @@ class User extends Authenticatable implements MustVerifyEmail
 {
     use HasFactory, Notifiable, SoftDeletes;
 
-    protected $fillable = ['name', 'email', 'password', 'role', 'status', 'email_verified_at', 'profile_picture'];
+    public const ROLES = ['super_admin' => 'Super Admin', 'admin' => 'Admin', 'teacher' => 'Teacher', 'student' => 'Student'];
+
+    // Roles are assigned explicitly by the authorized account service or trusted console.
+    protected $fillable = ['name', 'email', 'password', 'status', 'email_verified_at', 'profile_picture'];
 
     protected $hidden = ['password', 'remember_token'];
 
@@ -24,6 +27,21 @@ class User extends Authenticatable implements MustVerifyEmail
     public function student()
     {
         return $this->hasOne(Student::class);
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === 'super_admin';
+    }
+
+    public function isAcademicAdmin(): bool
+    {
+        return in_array($this->role, ['admin', 'super_admin'], true);
+    }
+
+    public function getRoleLabelAttribute(): string
+    {
+        return self::ROLES[$this->role] ?? 'Unknown role';
     }
 
     public function teacher()

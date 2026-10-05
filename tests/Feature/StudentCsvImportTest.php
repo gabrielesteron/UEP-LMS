@@ -27,7 +27,7 @@ class StudentCsvImportTest extends TestCase
 
     private function account(string $email, string $role = 'student'): User
     {
-        return User::create(['name' => 'Existing Name', 'email' => $email, 'password' => 'OriginalPassword123', 'role' => $role, 'status' => 'active', 'email_verified_at' => now()]);
+        return tap((new User)->forceFill(['name' => 'Existing Name', 'email' => $email, 'password' => 'OriginalPassword123', 'role' => $role, 'status' => 'active', 'email_verified_at' => now()]), fn ($user) => $user->save());
     }
 
     private function student(User $user, string $number = '2026-001'): Student

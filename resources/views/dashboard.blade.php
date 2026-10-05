@@ -8,9 +8,9 @@
             <h1>Welcome back, {{ $user->name }}.</h1>
             <p class="mb-0 text-secondary">{{ $user->role === 'student' ? 'Your next steps, recent class activity, and progress in one place.' : ($user->role === 'teacher' ? 'Start with your classes, teach, and keep track of your students.' : 'Set up classes, manage users, and monitor your academic community.') }}</p>
         </div>
-        <div class="align-self-center"><span class="pill">{{ ucfirst($user->role) }} workspace</span></div>
+        <div class="align-self-center"><span class="pill">{{ $user->role_label }} workspace</span></div>
     </div>
-    @if($user->role === 'admin')
+    @if($user->isAcademicAdmin())
         <div class="d-flex gap-2 flex-wrap mt-4">
             <a class="btn btn-primary" href="/admin/setup">+ Set Up School Year</a>
             <a class="btn btn-outline-secondary" href="/admin/setup?duplicate=1">Duplicate Previous Setup</a>

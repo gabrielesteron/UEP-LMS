@@ -65,7 +65,7 @@ class AcademicSetupServiceTest extends TestCase
 
     private function user(string $email, string $role, string $status = 'active'): User
     {
-        return User::create(['name' => 'Existing Account', 'email' => $email, 'password' => 'OriginalPassword123', 'role' => $role, 'status' => $status, 'email_verified_at' => $status === 'active' ? now() : null]);
+        return tap((new User)->forceFill(['name' => 'Existing Account', 'email' => $email, 'password' => 'OriginalPassword123', 'role' => $role, 'status' => $status, 'email_verified_at' => $status === 'active' ? now() : null]), fn ($user) => $user->save());
     }
 
     private function draft(array $overrides = []): array
@@ -289,7 +289,7 @@ class AcademicSetupServiceTest extends TestCase
         $before = $this->counts();
         $fail = true;
         DB::listen(function ($query) use (&$fail) {
-            if ($fail && str_contains(strtolower($query->sql), 'insert into "jobs"')) {
+            if ($fail && str_contains(strtolower(str_replace('`', '"', $query->sql)), 'insert into "jobs"')) {
                 throw new \RuntimeException('Simulated queue storage failure');
             }
         });

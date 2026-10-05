@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'Campus portal') · UEP LMS</title>
+    <title>@yield('title', 'Campus portal') · {{ config('lms.lms_name') }}</title>
     <link href="{{ asset('vendor/bootstrap.min.css') }}" rel="stylesheet">
     <link href="{{ asset('css/app.css') }}" rel="stylesheet">
 </head>
@@ -12,67 +12,30 @@
 @auth
 @php
     $portalUser = auth()->user();
-    $navigation = [
-        'Academic Management' => $portalUser->role === 'admin' ? [
-            '/admin/setup' => '+ Set Up School Year',
-            '/admin/manage/academic-years' => 'Academic Years',
-            '/admin/manage/programs' => 'Programs',
-            '/admin/manage/year-levels' => 'Year Levels',
-            '/admin/manage/blocks' => 'Blocks',
-            '/admin/manage/subjects' => 'Subjects',
-            '/admin/manage/students' => 'Students',
-            '/admin/manage/teachers' => 'Teachers',
-            '/admin/manage/teacher-assignments' => 'Classes & Teacher Assignments',
-            '/admin/manage/users' => 'User Accounts',
-        ] : ['/classes' => 'My Classes'],
-        'Learning & Activities' => [
-            '/classes?module=learning' => $portalUser->role === 'admin' ? 'Monitor Class Activities' : 'Lessons, Materials & Assignments',
-        ],
-        'Student Monitoring' => [
-            ...($portalUser->role === 'teacher' ? ['/classes?module=monitoring' => 'Record Attendance & Grades'] : []),
-            '/reports/attendance' => $portalUser->role === 'admin' ? 'Attendance Reports' : 'Attendance',
-            '/reports/grades' => $portalUser->role === 'admin' ? 'Grade Reports' : 'Grades',
-            ...($portalUser->role === 'student' ? ['/schedule' => 'Schedule'] : []),
-        ],
-    ];
-    if (config('lms.show_advanced_features')) {
-        $navigation['Learning & Activities']['/search'] = 'Search Learning Content';
-        $navigation['Learning & Activities']['/notifications'] = 'Notifications';
-        if ($portalUser->role === 'admin') {
-            $navigation['Student Monitoring']['/admin/settings'] = 'Attendance Settings';
-        }
-    }
+    $navigation = \App\Services\Navigation::for($portalUser);
 @endphp
 <a class="skip-link" href="#main-content">Skip to content</a>
 <div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
 <aside class="sidebar" id="sidebar" aria-label="Primary navigation">
     <button class="btn btn-sm btn-outline-light d-lg-none mb-3" type="button" id="menuClose">Close menu</button>
-    <a class="brand" href="/dashboard"><span class="brand-mark">U</span><span>UEP <b>LMS</b><small>THE CAMPUS LEARNING PORTAL</small></span></a>
+    <a class="brand" href="/dashboard"><span class="brand-mark">U</span><span>@if(config('lms.lms_name') === 'UEP LMS')UEP <b>LMS</b>@else{{ config('lms.lms_name') }}@endif<small>{{ config('lms.institution_name') }}</small></span></a>
     <a class="nav-item {{ request()->is('dashboard') ? 'active' : '' }}" href="/dashboard" @if(request()->is('dashboard')) aria-current="page" @endif>Overview</a>
     @foreach($navigation as $module => $links)
-        <nav aria-label="{{ $module }}" data-core-module>
-            <div class="nav-label">{{ $module }}</div>
+        <nav aria-label="{{ $module }}" @if($module === 'Announcements and profile') class="mt-4 border-top border-secondary pt-2" @elseif(!$portalUser->isAcademicAdmin()) data-core-module @endif>
+            @if($module !== 'Announcements and profile')<div class="nav-label">{{ $module }}</div>@endif
             @foreach($links as $url => $label)
-                @php
-                    $path = parse_url($url, PHP_URL_PATH);
-                    $active = $path === '/classes'
-                        ? request()->is('classes') && request('module', 'academic') === (str_contains($url, 'module=learning') ? 'learning' : (str_contains($url, 'module=monitoring') ? 'monitoring' : 'academic'))
-                        : request()->is(ltrim($path, '/'), ltrim($path, '/').'/*');
-                @endphp
+                @php($active = \App\Services\Navigation::active($url, request()))
                 <a class="nav-item {{ $active ? 'active' : '' }}" href="{{ $url }}" @if($active) aria-current="page" @endif>{{ $label }}</a>
             @endforeach
         </nav>
     @endforeach
-    <nav aria-label="Announcements and profile" class="mt-4 border-top border-secondary pt-2">
-        <a class="nav-item {{ request()->is('announcements') ? 'active' : '' }}" href="/announcements" @if(request()->is('announcements')) aria-current="page" @endif>Announcements</a>
-        <a class="nav-item {{ request()->is('profile*') ? 'active' : '' }}" href="/profile" @if(request()->is('profile*')) aria-current="page" @endif>My Profile</a>
-    </nav>
+
     <div class="sidebar-note">A focused space for<br>your academic journey.</div>
 </aside>
 <div class="workspace">
     <header class="topbar">
         <button class="btn btn-light d-lg-none" type="button" id="menuToggle" aria-controls="sidebar" aria-expanded="false">Menu</button>
-        <span class="workspace-label text-secondary">Academic workspace / <strong class="text-dark">{{ ucfirst($portalUser->role) }}</strong></span>
+        <span class="workspace-label text-secondary">Academic workspace / <strong class="text-dark">{{ $portalUser->role_label }}</strong></span>
         <div class="d-flex gap-3 align-items-center"><span class="user-name">{{ $portalUser->name }}</span><form method="post" action="/logout">@csrf<button class="btn btn-sm btn-outline-secondary">Sign out</button></form></div>
     </header>
     <main id="main-content">

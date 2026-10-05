@@ -38,6 +38,7 @@ section[id]{scroll-margin-top:1rem}
 @media(prefers-reduced-motion:reduce){.sidebar,.class-card{transition:none}}
 
 .nav-label{line-height:1.6;letter-spacing:1px}
+.brand>span:last-child{min-width:0;overflow-wrap:anywhere}.brand-mark{flex-shrink:0}
 .class-card .border-top{gap:12px;flex-wrap:wrap}
 .calendar-day .badge{max-width:100%;white-space:normal}
 .setup-steps{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}.setup-step{display:flex;align-items:center;gap:8px;padding:12px 10px;border:1px solid #dbe4e1;border-radius:6px;color:var(--navy);text-decoration:none;line-height:1.3;background:white}.setup-step>span{display:grid;place-items:center;flex-shrink:0;width:24px;height:24px;border-radius:50%;background:#e8eeeb}.setup-step.active{border-color:var(--teal);font-weight:600}.setup-step.active>span{background:var(--teal);color:white}.setup-search{max-width:360px}.class-workspace-tabs{flex-wrap:wrap}.bulk-grading-row,.bulk-attendance-row{overflow-wrap:anywhere}

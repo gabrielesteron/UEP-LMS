@@ -38,10 +38,12 @@ return new class extends Migration
         }
         Schema::dropIfExists('subject_prerequisites');
         Schema::table('subjects', function (Blueprint $table) {
-            $table->dropUnique('subjects_curriculum_unique');
-            $table->dropIndex('subjects_code_index');
+            // InnoDB may use the curriculum index to support program_id's FK.
+            // Drop the constraints first; the populated-curriculum guard above stays intact.
             $table->dropForeign(['program_id']);
             $table->dropForeign(['year_level_id']);
+            $table->dropUnique('subjects_curriculum_unique');
+            $table->dropIndex('subjects_code_index');
             $table->dropColumn(['program_id', 'year_level_id', 'semester', 'lecture_units', 'laboratory_units']);
             $table->unique('code');
         });

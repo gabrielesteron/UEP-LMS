@@ -13,7 +13,7 @@ class Access
     public static function classes(User $user): Builder
     {
         $q = TeacherAssignment::query()->with(['block.program', 'block.yearLevel', 'block.academicYear', 'subject', 'teacher.user']);
-        abort_unless(in_array($user->role, ['admin', 'teacher', 'student'], true), 403);
+        abort_unless(in_array($user->role, ['super_admin', 'admin', 'teacher', 'student'], true), 403);
         if ($user->role === 'teacher') {
             $q->whereHas('teacher', fn ($q) => $q->where('user_id', $user->id));
         }
@@ -26,16 +26,16 @@ class Access
 
     public static function classroom(User $user, TeacherAssignment $classroom, bool $write = false): void
     {
-        abort_unless(in_array($user->role, ['admin', 'teacher', 'student']) && self::classes($user)->whereKey($classroom->id)->exists(), 403);
+        abort_unless(self::classes($user)->whereKey($classroom->id)->exists(), 403);
         if ($write) {
-            abort_unless(in_array($user->role, ['admin', 'teacher']), 403);
+            abort_unless($user->isAcademicAdmin() || $user->role === 'teacher', 403);
         }
     }
 
     public static function announcements(User $user): Builder
     {
         $q = Announcement::query()->with('user');
-        if ($user->role === 'admin') {
+        if ($user->isAcademicAdmin()) {
             return $q;
         }
         $classScopes = self::classes($user)->withoutEagerLoads()->get(['id', 'block_id']);

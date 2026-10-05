@@ -14,18 +14,30 @@ use App\Models\User;
 use App\Notifications\Invitation;
 use App\Services\Catalog;
 use App\Services\ScheduleConflicts;
+use App\Services\UserAccounts;
+use App\Services\AdministrativeAudit;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
 class AdminController extends Controller
 {
-    public function index(Request $r, string $resource)
+    public function index(Request $r, string $resource, bool $adminsOnly = false)
     {
         [$model,$fields] = Catalog::definition($resource);
+        if ($resource === 'users') {
+            Gate::authorize('system-administration');
+            $r->validate(['q' => 'nullable|string|max:120', 'role' => 'nullable|in:super_admin,admin,teacher,student', 'status' => 'nullable|in:active,inactive,suspended', 'archived' => 'nullable|boolean']);
+            $q = $r->boolean('archived') ? User::onlyTrashed() : User::query();
+            $q->when($adminsOnly, fn ($q) => $q->where('role', 'admin'))
+                ->when(! $adminsOnly && $r->filled('role'), fn ($q) => $q->where('role', $r->role))
+                ->when($r->filled('status'), fn ($q) => $q->where('status', $r->status))
+                ->when($r->filled('q'), fn ($q) => $q->where(fn ($q) => $q->where('name', 'like', '%'.$r->q.'%')->orWhere('email', 'like', '%'.$r->q.'%')));
+            return view('admin.users', ['rows' => $q->latest('id')->paginate(15)->withQueryString(), 'adminsOnly' => $adminsOnly]);
+        }
         $q = $model::query();
         if ($resource === 'subjects') {
             $q->with(['program', 'yearLevel', 'prerequisites']);
@@ -53,9 +65,12 @@ class AdminController extends Controller
     public function form(string $resource, ?int $id = null)
     {
         [$model,$fields] = Catalog::definition($resource);
+        if ($resource === 'users') {
+            Gate::authorize('system-administration');
+        }
         $row = $id ? $model::findOrFail($id) : new $model;
-        if ($row instanceof User && $row->role === 'admin') {
-            abort(403, 'Manage administrator accounts with the console command.');
+        if ($resource === 'users' && ! $id && request('role') === 'admin') {
+            $row->role = 'admin';
         }
 
         $fieldChoices = collect($fields)->map(fn ($type) => Catalog::choices($type))->all();
@@ -72,6 +87,26 @@ class AdminController extends Controller
         [$model] = Catalog::definition($resource);
         $row = $id ? $model::findOrFail($id) : new $model;
         $data = $r->validated();
+        if ($resource === 'users') {
+            try {
+                $row = UserAccounts::save($r->user(), $data, $id);
+            } catch (QueryException $e) {
+                if (in_array($e->getCode(), ['23000', '23505'])) {
+                    return back()->withInput()->withErrors(['record' => 'A matching account already exists. Check the email and try again.']);
+                }
+                throw $e;
+            }
+            if (! $row->email_verified_at && $row->status === 'inactive') {
+                try {
+                    $this->sendInvitation($row);
+                    AdministrativeAudit::record($r->user(), 'invitation.sent', 'user', $row->id);
+                } catch (\Throwable $e) {
+                    report($e);
+                    return redirect('/admin/manage/users')->withErrors(['email' => 'Account saved, but mail delivery failed. Check SMTP and resend the invitation.']);
+                }
+            }
+            return redirect('/admin/manage/users')->with('success', 'Account saved. New accounts must activate using their invitation.');
+        }
         if ($resource === 'subjects' && $id && $row->program_id) {
             // Curriculum placement is maintained by the validated importer. Editing
             // titles and credit values must not move courses or prerequisite IDs.
@@ -79,23 +114,6 @@ class AdminController extends Controller
                 if ((string) ($data[$scope] ?? '') !== (string) $row->$scope) {
                     throw ValidationException::withMessages([$scope => 'Use the curriculum importer to change an imported course code or placement.']);
                 }
-            }
-        }
-        if ($row instanceof User) {
-            abort_if($row->role === 'admin', 403);
-            if ($id && ($row->student || $row->teacher) && $row->role !== $data['role']) {
-                throw ValidationException::withMessages(['role' => 'Remove the academic profile before changing this role.']);
-            }
-            if (! $id) {
-                $data['password'] = Str::random(48);
-                $data['status'] = 'inactive';
-            }
-            if ($id && ! $row->email_verified_at && $data['status'] === 'active') {
-                throw ValidationException::withMessages(['status' => 'The user must activate their account using the invitation.']);
-            }
-            if ($id && $data['email'] !== $row->email) {
-                $data['email_verified_at'] = null;
-                $data['status'] = 'inactive';
             }
         }
         if (in_array($resource, ['students', 'teachers'])) {
@@ -155,15 +173,6 @@ class AdminController extends Controller
             }
             throw $e;
         }
-        if ($row instanceof User && ! $row->email_verified_at && $row->status === 'inactive') {
-            try {
-                $this->sendInvitation($row);
-            } catch (\Throwable $e) {
-                report($e);
-
-                return redirect('/admin/manage/users')->withErrors(['email' => 'Account saved, but mail delivery failed. Check SMTP and resend the invitation.']);
-            }
-        }
 
         return redirect('/admin/manage/'.$resource)->with('success', 'Record saved.');
     }
@@ -171,11 +180,12 @@ class AdminController extends Controller
     public function delete(Request $r, string $resource, int $id)
     {
         [$model] = Catalog::definition($resource);
-        $row = $model::findOrFail($id);
-        if ($row instanceof User) {
-            abort_if($row->role === 'admin', 403);
-            $row->update(['status' => 'suspended']);
+        if ($resource === 'users') {
+            Gate::authorize('system-administration');
+            UserAccounts::archive($r->user(), $id);
+            return back()->with('success', 'Account archived. Academic records are preserved.');
         }
+        $row = $model::findOrFail($id);
         try {
             $row->delete();
         } catch (QueryException $e) {
@@ -190,10 +200,17 @@ class AdminController extends Controller
         $user->notify(new Invitation(Password::broker()->createToken($user)));
     }
 
-    public function invite(User $user)
+    public function invite(Request $r, User $user)
     {
+        Gate::authorize('system-administration');
         abort_unless($user->status === 'inactive' && ! $user->email_verified_at, 422);
-        $this->sendInvitation($user);
+        try {
+            $this->sendInvitation($user);
+            AdministrativeAudit::record($r->user(), 'invitation.sent', 'user', $user->id);
+        } catch (\Throwable $e) {
+            report($e);
+            return back()->withErrors(['email' => 'Mail delivery failed. Check SMTP and resend the invitation.']);
+        }
 
         return back()->with('success', 'Invitation sent.');
     }

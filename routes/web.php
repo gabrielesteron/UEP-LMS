@@ -38,9 +38,10 @@ Route::middleware(['auth', 'active'])->group(function () {
         return back()->with('success', 'Verification email sent.');
     })->middleware('throttle:3,1')->name('verification.send');
 });
-Route::middleware(['auth', 'active', 'verified'])->group(function () {
+Route::middleware(['auth', 'active', 'verified', 'system-config'])->group(function () {
     require __DIR__.'/teacher-workflows.php';
     require __DIR__.'/academic-setup.php';
+    require __DIR__.'/super-admin.php';
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     foreach (['admin', 'teacher', 'student'] as $role) {
         Route::redirect('/'.$role.'/dashboard', '/dashboard')->middleware('role:'.$role);

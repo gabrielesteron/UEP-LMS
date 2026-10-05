@@ -4,7 +4,7 @@
 <a href="/classes/{{ $session->teacher_assignment_id }}#monitoring">← {{ $session->classroom->label }}</a>
 <h1 class="mt-3">Attendance · {{ $session->date->format('M j, Y') }}</h1>
 <p class="text-secondary">{{ $session->start_time }}–{{ $session->end_time }} · Late threshold: {{ $session->late_threshold }} minutes. Teachers may edit within seven days. Admin changes require a reason.</p>
-@php($editable=auth()->user()->role==='admin' || !$session->date->lt(today()->subDays(7)))
+@php($editable=auth()->user()->isAcademicAdmin() || !$session->date->lt(today()->subDays(7)))
 @if(!$editable)<div class="alert alert-info">This session is read only. Attendance older than seven days requires an administrator correction.</div>@endif
 @if($enrollments->isNotEmpty())
 <form method="post" action="/attendance/sessions/{{ $session->id }}/bulk-records" data-bulk-attendance data-late-threshold="{{ $session->late_threshold }}">
@@ -31,7 +31,7 @@
                 </label>@error($key.'.status')<div class="text-danger small">{{ $message }}</div>@enderror</div>
                 <div class="col-6 col-md-3"><label class="form-label w-100">Minutes after start<input class="form-control @error($key.'.minutes_late') is-invalid @enderror" type="number" min="0" max="1440" name="records[{{ $enrollment->student_id }}][minutes_late]" value="{{ old($key.'.minutes_late',$record?->minutes_late) }}" data-attendance-minutes></label>@error($key.'.minutes_late')<div class="text-danger small">{{ $message }}</div>@enderror</div>
                 <div class="col-md-6"><label class="form-label w-100">Remarks<input class="form-control @error($key.'.remarks') is-invalid @enderror" name="records[{{ $enrollment->student_id }}][remarks]" maxlength="2000" value="{{ old($key.'.remarks',$record?->remarks) }}"></label>@error($key.'.remarks')<div class="text-danger small">{{ $message }}</div>@enderror</div>
-                @if(auth()->user()->role==='admin')
+                @if(auth()->user()->isAcademicAdmin())
                 <div class="col-12"><label class="form-label w-100">Correction reason (required)<input class="form-control @error($key.'.reason') is-invalid @enderror" name="records[{{ $enrollment->student_id }}][reason]" value="{{ old($key.'.reason') }}" maxlength="2000" required></label>@error($key.'.reason')<div class="text-danger small">{{ $message }}</div>@enderror</div>
                 @else
                 <div class="col-12"><details><summary>Correction note (optional)</summary><label class="form-label w-100 mt-2">Reason<input class="form-control" name="records[{{ $enrollment->student_id }}][reason]" value="{{ old($key.'.reason') }}" maxlength="2000"></label></details></div>

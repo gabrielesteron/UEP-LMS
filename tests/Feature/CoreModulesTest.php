@@ -43,7 +43,12 @@ class CoreModulesTest extends TestCase
             $page = $this->get('/dashboard')->assertOk();
             $dom = $this->dom($page->getContent());
             $modules = $dom->query('//aside/nav[@data-core-module]');
-            $this->assertSame(['Academic Management', 'Learning & Activities', 'Student Monitoring'], array_map(fn ($node) => $node->getAttribute('aria-label'), iterator_to_array($modules)));
+            if ($role === 'admin') {
+                $this->assertSame(0, $modules->length);
+                $this->assertSame(['Academic Setup', 'People', 'Classes', 'Learning & Activities', 'Reports', 'Account'], array_map(fn ($node) => $node->getAttribute('aria-label'), iterator_to_array($dom->query('//aside/nav'))));
+            } else {
+                $this->assertSame(['Academic Management', 'Learning & Activities', 'Student Monitoring'], array_map(fn ($node) => $node->getAttribute('aria-label'), iterator_to_array($modules)));
+            }
             $urls = array_unique(array_map(fn ($node) => html_entity_decode($node->getAttribute('href')), iterator_to_array($dom->query('//aside//a'))));
             foreach (['/search', '/notifications', '/admin/settings', '/reports/students', '/reports/enrollments'] as $hidden) {
                 $this->assertNotContains($hidden, $urls);
@@ -135,7 +140,7 @@ class CoreModulesTest extends TestCase
         $this->actingAs($this->user('admin'));
         DB::enableQueryLog();
         $this->get('/admin/manage/students')->assertOk()->assertSee('BSIT')->assertSee('Block');
-        $queries = collect(DB::getQueryLog())->filter(fn ($entry) => str_contains($entry['query'], 'from "blocks"'));
+        $queries = collect(DB::getQueryLog())->filter(fn ($entry) => str_contains(str_replace('`', '"', $entry['query']), 'from "blocks"'));
         $this->assertSame(1, $queries->count());
         DB::disableQueryLog();
     }

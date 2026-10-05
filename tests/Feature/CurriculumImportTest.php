@@ -47,7 +47,7 @@ class CurriculumImportTest extends TestCase
     {
         $this->seed();
         $before = $this->protectedData();
-        $legacy = Subject::whereNull('program_id')->get()->map->getAttributes()->all();
+        $legacy = Subject::whereNull('program_id')->orderBy('id')->get()->map->getAttributes()->all();
         $firstYear = YearLevel::where('level', 1)->first()->getAttributes();
         $rows = $this->rows();
         $result = $this->import();
@@ -70,7 +70,7 @@ class CurriculumImportTest extends TestCase
             }
         }
         $this->assertSame($before, $this->protectedData());
-        $this->assertSame($legacy, Subject::whereNull('program_id')->get()->map->getAttributes()->all());
+        $this->assertSame($legacy, Subject::whereNull('program_id')->orderBy('id')->get()->map->getAttributes()->all());
         $this->assertSame($firstYear, YearLevel::where('level', 1)->first()->getAttributes());
         // Conflicting codes have independent titles, credits and prerequisite IDs.
         $this->assertSame(4, Subject::where('code', 'OJT 401')->count());

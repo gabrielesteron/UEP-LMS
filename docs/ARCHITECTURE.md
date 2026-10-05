@@ -14,6 +14,12 @@ Lessons, materials, assignments, quizzes, schedules, grades and attendance sessi
 
 ## Authorization
 
+The `super_admin` role extends the same middleware and class access checks for
+full academic authority. System administration and existing User Accounts actions
+require Super Admin; Admin retains academic operations. See [Super Admin setup,
+account safety and navigation](SUPER_ADMIN.md). The only additive schema is the
+focused `administrative_audit_logs` table; existing account roles are unchanged.
+
 All portal routes require authentication, active account status and email verification. Administrative routes additionally require the admin role. `Access::classes` scopes reads to the teacher profile or explicit student enrollment. Every class mutation checks the classroom and role again. Submission downloads check student ownership; quiz attempts check ownership; report filters operate inside the authorized query. A `manage-class` gate is also registered for UI/extensions.
 
 `CatalogRequest` validates allowlisted administrative resources. `Catalog` defines those models, field types and validation rules. `AdminController` adds academic consistency and schedule conflict checks. Content forms use a separate allowlist in `ClassContent`; arbitrary table names, model classes, and submitted role fields are never accepted as persistence instructions.

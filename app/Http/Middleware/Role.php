@@ -9,7 +9,9 @@ class Role
 {
     public function handle(Request $request, Closure $next, string ...$roles)
     {
-        abort_unless($request->user() && in_array($request->user()->role, $roles), 403);
+        $user = $request->user();
+        abort_unless($user && (in_array($user->role, $roles, true)
+            || ($user->isSuperAdmin() && in_array('admin', $roles, true))), 403);
 
         return $next($request);
     }

@@ -18,11 +18,11 @@ class AnnouncementController extends Controller
 
     public function save(Request $r, ?int $id = null)
     {
-        abort_unless(in_array($r->user()->role, ['admin', 'teacher']), 403);
+        abort_unless(in_array($r->user()->role, ['super_admin', 'admin', 'teacher']), 403);
         $data = $r->validate(['title' => 'required|string|max:180', 'body' => 'required|string|max:10000', 'teacher_assignment_id' => ($r->user()->role === 'teacher' ? 'required|' : 'nullable|').'exists:teacher_assignments,id', 'program_id' => 'nullable|exists:programs,id', 'block_id' => 'nullable|exists:blocks,id']);
         $row = $id ? Announcement::findOrFail($id) : new Announcement;
         if ($id) {
-            abort_unless($r->user()->role === 'admin' || $row->user_id === $r->user()->id, 403);
+            abort_unless($r->user()->isAcademicAdmin() || $row->user_id === $r->user()->id, 403);
             if ($r->user()->role === 'teacher') {
                 Access::classroom($r->user(), $row->classroom, true);
             }
@@ -53,7 +53,7 @@ class AnnouncementController extends Controller
 
     public function delete(Request $r, Announcement $announcement)
     {
-        abort_unless($r->user()->role === 'admin' || ($r->user()->role === 'teacher' && $announcement->user_id === $r->user()->id), 403);
+        abort_unless($r->user()->isAcademicAdmin() || ($r->user()->role === 'teacher' && $announcement->user_id === $r->user()->id), 403);
         if ($r->user()->role === 'teacher') {
             Access::classroom($r->user(), $announcement->classroom, true);
         }

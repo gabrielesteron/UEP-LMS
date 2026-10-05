@@ -78,8 +78,11 @@ class AuthController extends Controller
             return response()->view('auth.activation-link-invalid', [], 410);
         }
         $r->validate(['password' => ['required', 'confirmed', PasswordRule::min(12)->mixedCase()->numbers()]]);
-        $user->update(['password' => $r->password, 'email_verified_at' => now(), 'status' => 'active']);
-        Password::broker()->deleteToken($user);
+        \Illuminate\Support\Facades\DB::transaction(function () use ($user, $r) {
+            $user->update(['password' => $r->password, 'email_verified_at' => now(), 'status' => 'active']);
+            Password::broker()->deleteToken($user);
+            \App\Services\AdministrativeAudit::record(null, 'account.activated', 'user', $user->id, ['old_status' => 'inactive', 'new_status' => 'active', 'source' => 'invitation']);
+        });
         event(new Verified($user));
 
         if (Auth::check()) {

@@ -21,7 +21,7 @@ class AttendanceService
     public static function editable(User $user, AttendanceSession $session): void
     {
         Access::classroom($user, $session->classroom, true);
-        if ($user->role !== 'admin' && $session->date->lt(today()->subDays(7))) {
+        if (! $user->isAcademicAdmin() && $session->date->lt(today()->subDays(7))) {
             throw ValidationException::withMessages(['date' => 'Attendance older than seven days requires an administrator correction.']);
         }
     }
@@ -79,7 +79,7 @@ class AttendanceService
 
     private static function prepare(User $user, AttendanceSession $session, array $data): array
     {
-        if ($user->role === 'admin' && blank($data['reason'] ?? null)) {
+        if ($user->isAcademicAdmin() && blank($data['reason'] ?? null)) {
             throw ValidationException::withMessages(['reason' => 'Administrator corrections require a reason.']);
         }
         if (isset($data['minutes_late']) && in_array($data['status'], ['present', 'late'])) {

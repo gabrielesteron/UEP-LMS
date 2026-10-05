@@ -53,6 +53,11 @@ class LmsTest extends TestCase
         return $this->user('admin@example.com');
     }
 
+    private function superAdmin(): User
+    {
+        return User::factory()->create(['role' => 'super_admin', 'status' => 'active']);
+    }
+
     private function attendance(?User $student = null, int $days = 0): AttendanceSession
     {
         $session = AttendanceSession::create(['teacher_assignment_id' => 1, 'date' => today()->subDays($days), 'start_time' => '15:00', 'end_time' => '16:00', 'late_threshold' => 15]);
@@ -95,7 +100,7 @@ class LmsTest extends TestCase
     public function test_invitation_activates_once_and_rejects_tampering(): void
     {
         Notification::fake();
-        $this->actingAs($this->admin())->post('/admin/manage/users', ['name' => 'Invited Learner', 'email' => 'invite@example.com', 'role' => 'student', 'status' => 'active'])->assertRedirect('/admin/manage/users');
+        $this->actingAs($this->superAdmin())->post('/admin/manage/users', ['name' => 'Invited Learner', 'email' => 'invite@example.com', 'role' => 'student', 'status' => 'active'])->assertRedirect('/admin/manage/users');
         $user = User::where('email', 'invite@example.com')->firstOrFail();
         $this->assertSame('inactive', $user->status);
         Notification::assertSentTo($user, Invitation::class);
@@ -121,7 +126,7 @@ class LmsTest extends TestCase
     public function test_resending_invitation_explains_why_an_older_link_no_longer_works(): void
     {
         Notification::fake();
-        $this->actingAs($this->admin())->post('/admin/manage/users', ['name' => 'Invited Learner', 'email' => 'invite@example.com', 'role' => 'student', 'status' => 'active'])->assertRedirect('/admin/manage/users');
+        $this->actingAs($this->superAdmin())->post('/admin/manage/users', ['name' => 'Invited Learner', 'email' => 'invite@example.com', 'role' => 'student', 'status' => 'active'])->assertRedirect('/admin/manage/users');
         $user = User::where('email', 'invite@example.com')->firstOrFail();
         $firstUrl = Notification::sent($user, Invitation::class)->first()->toMail($user)->actionUrl;
 
@@ -160,6 +165,11 @@ class LmsTest extends TestCase
     {
         $this->actingAs($this->admin());
         foreach (Catalog::all() as $resource => [$model]) {
+            if ($resource === 'users') {
+                $this->get('/admin/manage/users')->assertForbidden();
+                $this->get('/admin/manage/users/create')->assertForbidden();
+                continue;
+            }
             $this->get('/admin/manage/'.$resource)->assertOk();
             $this->get('/admin/manage/'.$resource.'/create')->assertOk();
             $row = $resource === 'users' ? $this->teacher() : $model::first();
@@ -186,8 +196,8 @@ class LmsTest extends TestCase
 
     public function test_duplicate_email_and_role_escalation_are_rejected(): void
     {
-        $this->actingAs($this->admin())->post('/admin/manage/users', ['name' => 'Duplicate', 'email' => 'student@example.com', 'role' => 'student', 'status' => 'inactive'])->assertSessionHasErrors('email');
-        $this->post('/admin/manage/users', ['name' => 'Bad Admin', 'email' => 'bad@example.com', 'role' => 'admin', 'status' => 'active'])->assertSessionHasErrors('role');
+        $this->actingAs($this->superAdmin())->post('/admin/manage/users', ['name' => 'Duplicate', 'email' => 'student@example.com', 'role' => 'student', 'status' => 'inactive'])->assertSessionHasErrors('email');
+        $this->actingAs($this->admin())->post('/admin/manage/users', ['name' => 'Bad Admin', 'email' => 'bad@example.com', 'role' => 'super_admin', 'status' => 'active'])->assertForbidden();
         $this->actingAs($this->teacher())->get('/admin/manage/users')->assertForbidden();
         $this->actingAs($this->user())->post('/admin/manage/programs', ['code' => 'BAD', 'name' => 'Denied'])->assertForbidden();
     }
@@ -228,7 +238,7 @@ class LmsTest extends TestCase
     public function test_unknown_role_cannot_inherit_class_or_announcement_access(): void
     {
         $user = $this->user();
-        $user->update(['role' => 'observer']);
+        $user->forceFill(['role' => 'observer'])->save();
 
         $this->actingAs($user)->get('/classes')->assertForbidden();
         $this->get('/announcements')->assertForbidden();

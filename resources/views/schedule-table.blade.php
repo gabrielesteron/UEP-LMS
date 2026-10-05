@@ -17,6 +17,6 @@
             </div>
         </section>
     @empty
-        <div class="col-12"><div class="empty">No scheduled classes yet.{{ auth()->user()->role === 'student' ? ' Your administrator will publish your class schedule.' : '' }}@if(auth()->user()->role === 'admin')<div class="mt-3"><a class="btn btn-primary btn-sm" href="/admin/manage/schedules/create">Add Schedule</a></div>@endif</div></div>
+        <div class="col-12"><div class="empty">No scheduled classes yet.{{ auth()->user()->role === 'student' ? ' Your administrator will publish your class schedule.' : '' }}@if(auth()->user()->isAcademicAdmin())<div class="mt-3"><a class="btn btn-primary btn-sm" href="/admin/manage/schedules/create">Add Schedule</a></div>@endif</div></div>
     @endforelse
 </div>

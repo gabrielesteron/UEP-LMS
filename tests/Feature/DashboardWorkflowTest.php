@@ -112,12 +112,12 @@ class DashboardWorkflowTest extends TestCase
         Lesson::create(['teacher_assignment_id' => 7, 'title' => 'Secret other block lesson', 'content' => 'Private', 'position' => 2, 'status' => 'published']);
         LearningMaterial::create(['teacher_assignment_id' => 1, 'title' => 'Fresh reading', 'path' => 'test.pdf', 'original_name' => 'test.pdf', 'status' => 'published']);
         $assignment = $this->assignment('Fresh assignment');
-        Grade::create(['teacher_assignment_id' => 1, 'student_id' => 1, 'source_type' => 'assignment', 'source_id' => $assignment->id, 'title' => 'My recent grade', 'score' => 18, 'total_points' => 20]);
+        $recentGrade = Grade::create(['teacher_assignment_id' => 1, 'student_id' => 1, 'source_type' => 'assignment', 'source_id' => $assignment->id, 'title' => 'My recent grade', 'score' => 18, 'total_points' => 20])->fresh();
         Grade::create(['teacher_assignment_id' => 1, 'student_id' => 2, 'source_type' => 'assignment', 'source_id' => $assignment->id, 'title' => 'Secret other student grade', 'score' => 10, 'total_points' => 20]);
 
         $page = $this->actingAs($this->user('student'))->get('/dashboard')->assertOk()
             ->assertSee('Fresh lesson')->assertSee('Fresh reading')->assertSee('Fresh assignment')
-            ->assertSee('My recent grade')->assertSee('18 / 20 points')
+            ->assertSee('My recent grade')->assertSee($recentGrade->score.' / '.$recentGrade->total_points.' points')
             ->assertDontSee('Secret draft lesson')->assertDontSee('Secret other block lesson')->assertDontSee('Secret other student grade');
         $this->assertLessThanOrEqual(8, $page->viewData('recentActivity')->count());
         $this->assertSame(['New assignment', 'New lesson', 'New material', 'Recent grade'], $page->viewData('recentActivity')->pluck('label')->unique()->sort()->values()->all());
@@ -154,7 +154,7 @@ class DashboardWorkflowTest extends TestCase
         $this->actingAs($this->user('student'));
         DB::enableQueryLog();
         $page = $this->get('/dashboard')->assertOk();
-        $queries = collect(DB::getQueryLog())->pluck('query');
+        $queries = collect(DB::getQueryLog())->pluck('query')->map(fn ($query) => str_replace('`', '"', $query));
         DB::disableQueryLog();
         $this->assertFalse($queries->contains(fn ($query) => str_contains($query, 'from "quizzes"')));
         $this->assertFalse($queries->contains(fn ($query) => str_contains($query, 'from "notifications"')));

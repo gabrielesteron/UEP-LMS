@@ -127,7 +127,7 @@ class TeacherWorkflowTest extends TestCase
         }
         DB::enableQueryLog();
         $this->actingAs($this->user())->put($url, ['records' => $this->attendanceRows()])->assertSessionHasNoErrors();
-        $enrollmentQueries = collect(DB::getQueryLog())->filter(fn ($query) => str_starts_with($query['query'], 'select') && str_contains($query['query'], 'from "enrollments"'));
+        $enrollmentQueries = collect(DB::getQueryLog())->filter(fn ($query) => str_starts_with($query['query'], 'select') && str_contains(str_replace('`', '"', $query['query']), 'from "enrollments"'));
         $this->assertSame(1, $enrollmentQueries->count());
         DB::disableQueryLog();
     }
@@ -144,14 +144,15 @@ class TeacherWorkflowTest extends TestCase
         $this->assertDatabaseHas('grades', ['source_type' => 'assignment', 'source_id' => 1, 'student_id' => 2, 'score' => 70]);
         $this->assertSame('returned', $second->fresh()->status);
         $this->assertSame(3, Assignment::find(1)->submissions()->count());
-        $this->actingAs($this->user('student2@example.com'))->get('/assignments/1')->assertSee('Please revise')->assertSee('70 / 100')->assertDontSee('Save All Grades');
+        $this->actingAs($this->user('student2@example.com'))->get('/assignments/1')->assertSee('Please revise')->assertSee($second->fresh()->score.' / '.Assignment::findOrFail(1)->total_points)->assertDontSee('Save All Grades');
     }
 
     public function test_existing_submission_remains_visible_and_gradable_after_enrollment_removal(): void
     {
         Enrollment::where('teacher_assignment_id', 1)->where('student_id', 1)->delete();
+        $submission = AssignmentSubmission::findOrFail(1);
         $this->actingAs($this->user('admin@example.com'))->get('/assignments/1')->assertOk()
-            ->assertSee('Demo Jamie Flores')->assertSee('Former enrollment')->assertSee('92 / 100')->assertDontSee('Save All Grades');
+            ->assertSee('Demo Jamie Flores')->assertSee('Former enrollment')->assertSee($submission->score.' / '.Assignment::findOrFail(1)->total_points)->assertDontSee('Save All Grades');
         $this->actingAs($this->user())->get('/assignments/1')->assertOk()
             ->assertSee('Demo Jamie Flores')->assertSee('Former enrollment')->assertSee('name="expected_count" value="1"', false)
             ->assertSee('name="grades[1][score]"', false)->assertSee('Save All Grades');

@@ -25,6 +25,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Paginator::useBootstrapFive();
-        Gate::define('manage-class', fn (User $user, TeacherAssignment $classroom) => in_array($user->role, ['admin', 'teacher']) && Access::classes($user)->whereKey($classroom->id)->exists());
+        Gate::define('system-administration', fn (User $user) => $user->isSuperAdmin());
+        Gate::define('manage-class', fn (User $user, TeacherAssignment $classroom) => in_array($user->role, ['super_admin', 'admin', 'teacher']) && Access::classes($user)->whereKey($classroom->id)->exists());
     }
 }

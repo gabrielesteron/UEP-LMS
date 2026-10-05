@@ -86,7 +86,7 @@
 <section id="students" class="card"><div class="card-header d-flex justify-content-between flex-wrap gap-2"><h2 class="mb-0">Class roster</h2>@if(config('lms.show_advanced_features'))<a href="/reports/students?class_id={{ $classroom->id }}">Export roster →</a>@endif</div>
 <div class="card-body"><div class="table-responsive"><table class="table"><thead><tr><th>Student number</th><th>Name</th><th>Email</th></tr></thead><tbody>
     @forelse($students as $person)<tr><td>{{ $person->student_number }}</td><td>{{ $person->user->name }}</td><td>{{ $person->user->email }}</td></tr>
-    @empty<tr><td colspan="3">No students found. @if(auth()->user()->role==='admin')<a href="/admin/manage/enrollments/create">Enroll a student</a>@else Ask an administrator to enroll students in this class.@endif</td></tr>@endforelse
+    @empty<tr><td colspan="3">No students found. @if(auth()->user()->isAcademicAdmin())<a href="/admin/manage/enrollments/create">Enroll a student</a>@else Ask an administrator to enroll students in this class.@endif</td></tr>@endforelse
 </tbody></table></div></div></section>
 @endunless
 @endsection

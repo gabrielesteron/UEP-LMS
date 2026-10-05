@@ -21,7 +21,7 @@ class AttendanceController extends Controller
     {
         Access::classroom($r->user(), $classroom, true);
         $data = $r->validate(['date' => 'required|date|before_or_equal:today', 'start_time' => 'required|date_format:H:i', 'end_time' => 'required|date_format:H:i|after:start_time']);
-        if ($r->user()->role !== 'admin' && Carbon::parse($data['date'])->lt(today()->subDays(7))) {
+        if (! $r->user()->isAcademicAdmin() && Carbon::parse($data['date'])->lt(today()->subDays(7))) {
             return back()->withInput()->withErrors(['date' => 'Only administrators can create attendance more than seven days ago.']);
         }
         try {
@@ -68,7 +68,7 @@ class AttendanceController extends Controller
             'records.*.status' => 'required|in:present,late,absent,excused',
             'records.*.minutes_late' => $completeRow.'nullable|integer|min:0|max:1440',
             'records.*.remarks' => $completeRow.'nullable|string|max:2000',
-            'records.*.reason' => $completeRow.($r->user()->role === 'admin' ? 'required' : 'nullable').'|string|max:2000',
+            'records.*.reason' => $completeRow.($r->user()->isAcademicAdmin() ? 'required' : 'nullable').'|string|max:2000',
         ], ['records.*.minutes_late.present' => 'An attendance field did not reach the server. No records were changed. Ask an administrator to check the form-input limit.',
             'records.*.remarks.present' => 'An attendance field did not reach the server. No records were changed. Ask an administrator to check the form-input limit.',
             'records.*.reason.present' => 'An attendance field did not reach the server. No records were changed. Ask an administrator to check the form-input limit.']);

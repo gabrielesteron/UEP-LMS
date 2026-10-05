@@ -70,7 +70,7 @@ class MultiProgramSetupTest extends TestCase
 
     private function account(string $name, string $role): User
     {
-        return User::create(['name' => 'Multi Program '.$name, 'email' => $name.'@example.com', 'password' => 'TestPassword123', 'role' => $role, 'status' => 'active', 'email_verified_at' => now()]);
+        return tap((new User)->forceFill(['name' => 'Multi Program '.$name, 'email' => $name.'@example.com', 'password' => 'TestPassword123', 'role' => $role, 'status' => 'active', 'email_verified_at' => now()]), fn ($user) => $user->save());
     }
 
     private function year(): array

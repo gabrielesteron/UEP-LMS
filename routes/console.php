@@ -24,7 +24,12 @@ Artisan::command('lms:create-admin', function () {
 
 return 1;
     }
-    User::create(compact('name', 'email', 'password') + ['role' => 'admin', 'status' => 'active', 'email_verified_at' => now()]);
+    DB::transaction(function () use ($name, $email, $password) {
+        $user = new User(compact('name', 'email', 'password') + ['status' => 'active', 'email_verified_at' => now()]);
+        $user->role = 'admin';
+        $user->save();
+        \App\Services\AdministrativeAudit::record(null, 'user.created', 'user', $user->id, ['source' => 'console', 'changed_fields' => ['name', 'email', 'role', 'status']]);
+    });
     $this->info('Administrator created.');
 })->purpose('Create a trusted administrator interactively without exposing a password in shell history');
 Artisan::command('lms:deadlines', function () {

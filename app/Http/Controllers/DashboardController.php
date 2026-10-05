@@ -45,13 +45,13 @@ class DashboardController extends Controller
             ->selectRaw("SUM(CASE WHEN status IN ('present', 'late') THEN 1 ELSE 0 END) AS attended, SUM(CASE WHEN status IN ('present', 'late', 'absent') THEN 1 ELSE 0 END) AS applicable")->first();
         // Same calculation as AttendanceService::rate: excused records do not lower attendance.
         $rate = $attendance->applicable > 0 ? round($attendance->attended / $attendance->applicable * 100, 1) : null;
-        $stats = $user->role === 'admin' ? ['Students' => Student::count(), 'Teachers' => Teacher::count(), 'Programs' => Program::count(), 'Blocks' => Block::count(), 'Subjects' => Subject::count(), 'Active classes' => $classCount, 'Assignments' => Assignment::count(), 'Awaiting grading' => AssignmentSubmission::whereNull('graded_at')->whereIn('id', AssignmentSubmission::selectRaw('MAX(id)')->groupBy('assignment_id', 'student_id'))->count()] : ['My classes' => $classCount, 'Upcoming assignments' => $user->role === 'student' ? (clone $assignmentQuery)->where('due_at', '>=', now())->count() : $upcoming->count(), ...(config('lms.show_advanced_features') ? ['Available / upcoming quizzes' => $quizzes->count()] : []), 'Attendance' => $rate === null ? 'N/A' : $rate.'%'];
+        $stats = $user->isAcademicAdmin() ? ['Students' => Student::count(), 'Teachers' => Teacher::count(), 'Programs' => Program::count(), 'Blocks' => Block::count(), 'Subjects' => Subject::count(), 'Active classes' => $classCount, 'Assignments' => Assignment::count(), 'Awaiting grading' => AssignmentSubmission::whereNull('graded_at')->whereIn('id', AssignmentSubmission::selectRaw('MAX(id)')->groupBy('assignment_id', 'student_id'))->count()] : ['My classes' => $classCount, 'Upcoming assignments' => $user->role === 'student' ? (clone $assignmentQuery)->where('due_at', '>=', now())->count() : $upcoming->count(), ...(config('lms.show_advanced_features') ? ['Available / upcoming quizzes' => $quizzes->count()] : []), 'Attendance' => $rate === null ? 'N/A' : $rate.'%'];
         $schedules = $user->role === 'student' ? collect() : ClassSchedule::whereIn('teacher_assignment_id', $ids)->with('classroom.subject', 'classroom.block.program', 'classroom.teacher.user')->orderBy('day')->orderBy('start_time')->limit(12)->get();
-        $recentUsers = $user->role === 'admin' ? User::latest()->limit(5)->get() : collect();
+        $recentUsers = $user->isSuperAdmin() ? User::latest()->limit(5)->get() : collect();
         $gradeQuery = Grade::whereIn('teacher_assignment_id', $ids)->when($user->role === 'student', fn ($q) => $q->where('student_id', $studentId));
         $gradeTotals = (clone $gradeQuery)->selectRaw('SUM(score) as score, SUM(total_points) as total_points')->first();
         $gradeAverage = $gradeTotals->total_points > 0 ? round($gradeTotals->score / $gradeTotals->total_points * 100, 1) : null;
-        $needsAttention = $user->role === 'admin' ? $this->adminAttention() : collect();
+        $needsAttention = $user->isAcademicAdmin() ? $this->adminAttention() : collect();
         $studentAttention = collect();
         $recentActivity = collect();
         if ($user->role === 'student') {
@@ -84,7 +84,7 @@ class DashboardController extends Controller
         }
         foreach ([
             ['Blocks without subjects', 'Assign subjects and teachers to these blocks.', Block::doesntHave('classes')->count(), '/admin/manage/teacher-assignments'],
-            ['Classes with unavailable teachers', 'Review archived, inactive or suspended teacher accounts.', TeacherAssignment::whereDoesntHave('teacher.user', fn ($q) => $q->where('status', 'active')->where('role', 'teacher'))->count(), '/admin/manage/users?role=teacher'],
+            ['Classes with unavailable teachers', 'Review archived, inactive or suspended teacher accounts.', TeacherAssignment::whereDoesntHave('teacher.user', fn ($q) => $q->where('status', 'active')->where('role', 'teacher'))->count(), '/admin/manage/teachers'],
             ['Students missing required information', 'Add the student profile, student number or block placement.', User::where('role', 'student')->where(fn ($q) => $q->where('name', '')->orWhere('email', '')->orWhereDoesntHave('student')->orWhereHas('student', fn ($q) => $q->where('student_number', '')->orWhereDoesntHave('block')))->count(), '/admin/manage/students'],
             ['Classes missing schedules', 'Add the weekly day, time and room for each class.', TeacherAssignment::doesntHave('schedules')->count(), '/admin/manage/schedules'],
         ] as [$label, $detail, $count, $url]) {

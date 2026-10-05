@@ -4,7 +4,7 @@
 <h1 class="mb-4">{{ $row->exists?'Edit':'Add' }} {{ Str::singular(Str::headline($resource)) }}</h1>
 <div class="card" style="max-width:760px"><div class="card-body">
     @if($resource==='users')
-        <p class="small-muted">New accounts receive an activation invitation. Roles are assigned by administrators; administrator accounts are created using the secure console command.</p>
+        <p class="small-muted">New accounts receive an activation invitation. Roles are assigned by Super Admins. Linked Student/Teacher profiles retain their roles. Your own Super Admin role, access status and email are protected.</p>
     @endif
     @if($resource==='students')
         <p class="small-muted">Program and year level are inherited from the block. Saving placement enrolls the student in all classes in that block.</p>
@@ -21,7 +21,7 @@
     @if($missingRelated)
         <div class="alert alert-info">Create the required related records before saving this form.</div>
     @endif
-    <form method="post" action="/admin/manage/{{ $resource }}{{ $row->exists?'/'.$row->id:'' }}">
+    <form method="post" action="/admin/manage/{{ $resource }}{{ $row->exists?'/'.$row->id:'' }}" @if($resource === 'users' && $row->exists) data-confirm="Save these account details, role and access status?" @endif>
         @csrf
         @if($row->exists) @method('PUT') @endif
         @include('components.fields')
